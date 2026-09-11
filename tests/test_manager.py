@@ -180,6 +180,21 @@ class ManagerTests(unittest.TestCase):
         self.assertIn(b'Target=240', (self.game / manage.CONFIG).read_bytes())
         self.assertIn(b'Sharpening=-1', (self.game / manage.CONFIG).read_bytes())
 
+    def test_export_diagnostics_writes_a_report_without_touching_the_game(self):
+        import os
+        self.install()
+        before = sorted(p.name for p in self.game.iterdir())
+        with patch.dict(os.environ, LOCALAPPDATA=str(self.package.parent / 'appdata')):
+            (self.package.parent / 'appdata' / 'EndfieldEnhancer').mkdir(parents=True)
+            (self.package.parent / 'appdata' / 'EndfieldEnhancer' / 'runtime-7.log').write_text('Applied target=144 vsync=0')
+            result = manage.export_diagnostics(self.game)
+        report = Path(result['path']).read_text(encoding='utf-8')
+        self.assertIn('== Installation and DLSS state ==', report)
+        self.assertIn('"installation_phase": "installed"', report)
+        self.assertIn('runtime-7.log', report)
+        self.assertIn('Applied target=144', report)
+        self.assertEqual(sorted(p.name for p in self.game.iterdir()), before)
+
     def test_graphics_validation(self):
         for graphics in ({'Sharpening': 101}, {'RenderScale': 0}, {'ShadowResolution': 9000},
                          {'Anisotropic': 16}, {'AmbientOcclusion': 2}, {'TemporalAA': 2},

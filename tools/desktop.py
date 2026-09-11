@@ -5,8 +5,10 @@ import json
 import os
 from pathlib import Path
 import queue
+import subprocess
 import sys
 import threading
+import traceback
 import tkinter as tk
 from tkinter import messagebox, filedialog
 import customtkinter as ctk
@@ -60,6 +62,7 @@ class Panel(Actions):
         self.game_running = False
         self.closed = threading.Event()
         self.buttons = []
+        self.runtime_warned = False
         self.status = tk.StringVar(value='Local design preview - game files are unchanged.' if self.preview else 'Ready. Apply settings while the game is running.')
         self.game = tk.StringVar(value=desktop_state.selected() or find_game())
         self.fps = tk.StringVar(value='144')
@@ -141,7 +144,7 @@ class Panel(Actions):
         self.label(maintenance,'Close the game before setup, repair, or removal. ReShade itself is managed by its setup wizard. Removing components preserves your edited ReShade settings.',12,'text.muted',wraplength=690,justify='left').pack(anchor='w',pady=6)
         self.show_page('Performance')
         graphics=ctk.CTkScrollableFrame(graphics_tab,fg_color=color('surface.base'));graphics.pack(fill='both',expand=True)
-        self.section(performance,'Performance','Set up the FPS unlocker below, then choose your frame-rate settings.')
+        self.section(performance,'Performance','Step 1: choose Set up FPS unlocker (bottom right) with Endfield closed. Step 2: pick a frame-rate profile and save it.')
         presets=ctk.CTkFrame(performance,fg_color='transparent'); presets.pack(fill='x',pady=16)
         for text,value in [('120 FPS','120'),('144 FPS','144'),('240 FPS','240'),('Unlimited','-1')]:
             self.button(presets,text,lambda value=value:self.fps.set(value),False).pack(side='left',padx=(0,10),expand=True,fill='x')
@@ -166,7 +169,7 @@ class Panel(Actions):
         self.section(recovery,'FPS recovery & diagnostics','Restore the FPS unlocker files or return to a previous FPS build.')
         self.label(recovery,'Manage neural rendering separately on the DLSS 5 page.',12,'text.muted').pack(anchor='w',pady=6)
         recoveryrow=ctk.CTkFrame(recovery,fg_color='transparent'); recoveryrow.pack(fill='x',pady=16)
-        for label,action in [('Inspect installation','inspect'),('Previous build','rollback'),('Remove FPS unlocker','restore')]:
+        for label,action in [('Inspect installation','inspect'),('Export diagnostics','export_diagnostics'),('Previous build','rollback'),('Remove FPS unlocker','restore')]:
             self.button(recoveryrow,label,lambda action=action:self.run(action),False).pack(side='left',padx=(0,10))
         self.output=ctk.CTkTextbox(recovery,fg_color=color('surface.sunken'),text_color=color('text.muted'),font=('Inter',12),height=220)
         self.output.pack(fill='both',expand=True)
@@ -210,7 +213,7 @@ class Panel(Actions):
             button.configure(fg_color=color('surface.highest' if key==name else 'surface.base'),
                              text_color=color('accent.default' if key==name else 'text.muted'))
     def run(self,action):
-        if self.preview and action not in ('inspect','diagnostics'):
+        if self.preview and action not in ('inspect','diagnostics','export_diagnostics'):
             self.status.set('Design preview only. Applying or installing is disabled in this preview.')
             return
         super().run(action)
@@ -295,32 +298,89 @@ class Panel(Actions):
             try:
                 data=live_status.snapshot()
                 self.live_events.put(data)
+                if data.get('running') and not self.preview:live_status.record_session(data)
             except Exception as error: self.live_events.put({'error':str(error)})
             self.closed.wait(2)
+    FPS_MESSAGES={
+        'install':('FPS unlocker installed. Launch Endfield; the header reports the applied cap once the runtime starts.','FPS unlocker setup stopped.'),
+        'configure':('Game settings saved. A running game picks them up within about a second.','Game settings were not saved.'),
+        'reset_graphics':('Graphics overrides released.','Graphics reset stopped.'),
+        'restore':('FPS unlocker removed and the original compiler restored.','FPS unlocker removal stopped.'),
+        'rollback':('Previous FPS build restored.','The previous build could not be restored.'),
+        'inspect':('Installation inspected.','Inspection failed.'),
+        'diagnostics':('Diagnostics collected.','Diagnostics failed.'),
+        'export_diagnostics':('Diagnostics report saved.','The diagnostics report could not be saved.')}
     def poll(self):
+        # One failing callback must never stop the event loop; the panel would look frozen.
+        try:self.process_events()
+        except Exception as error:self.report_failure(error)
+        self.window.after(150,self.poll)
+    def process_events(self):
         try:
             event=self.events.get_nowait();success,result=event[:2];self.busy=False
             for button in self.buttons:button.configure(state='normal')
-            is_neural=len(event)>2 and event[2]=='neural'
-            self.status.set(('DLSS setup checked.' if is_neural else 'Game settings updated.') if success else 'Could not complete the action. See the status panel for details.')
-            if is_neural:
+            kind=event[2] if len(event)>2 else None
+            if kind=='neural':
+                self.status.set('DLSS setup checked.' if success else 'Could not complete the DLSS action. Details are on the DLSS 5 page.')
                 self.nr_output.configure(state='normal');self.nr_output.delete('1.0','end');self.nr_output.insert('1.0',result);self.nr_output.configure(state='disabled')
-            if not is_neural:
+            else:
+                done,failed=self.FPS_MESSAGES.get(kind,('Finished.','Action stopped.'))
+                self.status.set(done if success else failed+' Details are on the Recovery page.')
                 self.output.configure(state='normal');self.output.delete('1.0','end');self.output.insert('1.0',result);self.output.configure(state='disabled')
-            if success and not is_neural:self.load_profile()
+                if success:self.load_profile()
+                self.announce(kind,success,result)
         except queue.Empty:pass
         try:
             data=self.live_events.get_nowait()
             if 'error' in data:self.callback_badge.configure(text='Runtime status unavailable')
             else:
-                self.live_badge.configure(text=f"● GAME RUNNING  ·  {data['pid']}" if data['running'] else 'WAITING FOR GAME',text_color=color('status.live' if data['running'] else 'text.muted'))
-                self.game_running=data['running']
+                running=data['running']
+                self.live_badge.configure(text=f"● GAME RUNNING  ·  {data['pid']}" if running else 'WAITING FOR GAME',text_color=color('status.live' if running else 'text.muted'))
+                self.game_running=running
                 cap=data['cap'];self.cap_badge.configure(text='Applied cap -' if cap is None else ('Uncapped' if cap==-1 else f'{cap} FPS applied cap'))
-                self.callback_badge.configure(text=data['graphics'])
+                runtime=data.get('runtime','idle')
+                if runtime=='missing':
+                    self.callback_badge.configure(text='Runtime not detected',text_color=color('status.warning'))
+                    if not self.runtime_warned:
+                        self.runtime_warned=True
+                        self.status.set('Endfield is running but the FPS runtime has not reported. Open Recovery, choose Inspect installation, then Export diagnostics.')
+                elif runtime=='stopped':
+                    self.callback_badge.configure(text='Runtime stopped - see Recovery log',text_color=color('status.warning'))
+                else:
+                    self.callback_badge.configure(text=data['graphics'],text_color=color('text.muted'))
+                if not running:self.runtime_warned=False
                 self.runtime_output.configure(state='normal');self.runtime_output.delete('1.0','end');self.runtime_output.insert('1.0','\n'.join(data['lines']));self.runtime_output.configure(state='disabled');self.runtime_output.see('end')
         except queue.Empty:pass
         self.update_nr_availability()
-        self.window.after(150,self.poll)
+    def announce(self,kind,success,result):
+        """Surface outcomes where the user is; the JSON detail stays on the Recovery page."""
+        if kind in ('inspect','diagnostics',None):return
+        if not success:
+            if result.startswith('Windows denied write access'):
+                if messagebox.askyesno('Administrator rights needed',result+'\n\nRestart Fate Engine as administrator now?'):self.relaunch_elevated()
+            elif self.active_page!='Recovery':messagebox.showerror('Fate Engine',result)
+            return
+        if kind=='export_diagnostics':
+            path=json.loads(result).get('path','')
+            if path and os.name=='nt':subprocess.Popen(['explorer','/select,',path])
+            messagebox.showinfo('Diagnostics saved','Report saved to:\n'+path+'\n\nAttach this file when reporting a problem.')
+        elif kind in ('install','restore','rollback') and self.active_page!='Recovery':
+            messagebox.showinfo('Fate Engine',self.FPS_MESSAGES[kind][0])
+    def relaunch_elevated(self):
+        if os.name!='nt':return
+        if getattr(sys,'frozen',False):target,params=sys.executable,''
+        else:target,params=sys.executable,subprocess.list2cmdline([str(Path(__file__).resolve())])
+        if ctypes.windll.shell32.ShellExecuteW(None,'runas',target,params,None,1)>32:self.close()
+        else:self.status.set('Administrator restart was cancelled. Grant write access to the game folder, then retry.')
+    def report_failure(self,error):
+        try:
+            folder=Path(os.environ['LOCALAPPDATA'])/'EndfieldEnhancer';folder.mkdir(parents=True,exist_ok=True)
+            with (folder/'desktop.log').open('a',encoding='utf-8') as log:
+                log.write(datetime.datetime.now().isoformat(timespec='seconds')+' '+''.join(traceback.format_exception(error)))
+        except Exception:pass
+        self.busy=False
+        for button in self.buttons:button.configure(state='normal')
+        self.status.set('An unexpected error was written to desktop.log in the EndfieldEnhancer folder. The panel keeps running.')
     def close(self):
         if self.busy:messagebox.showinfo('Action in progress','Wait for the current action to finish before closing.')
         else:self.closed.set();self.window.destroy()

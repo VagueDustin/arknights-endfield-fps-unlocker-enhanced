@@ -2,6 +2,7 @@
 import argparse
 import configparser
 import ctypes
+import datetime
 import hashlib
 import json
 import os
@@ -336,14 +337,77 @@ def diagnostics(game):
     logs = sorted((Path(local) / 'EndfieldEnhancer').glob('runtime-*.log'),
                   key=lambda path: path.stat().st_mtime, reverse=True) if local else []
     result['latest_runtime_log'] = logs[0].name if logs else None
+    result['latest_runtime_log_modified'] = (datetime.datetime.fromtimestamp(logs[0].stat().st_mtime)
+                                             .isoformat(timespec='seconds') if logs else None)
     result['latest_runtime_log_tail'] = logs[0].read_text(errors='replace').splitlines()[-30:] if logs else []
     result['log_note'] = 'Logs may belong to an earlier launch or the test harness; check timestamps.'
+    try:
+        result['package_version'] = json.loads((package_directory() / 'package.json').read_text()).get('version')
+    except (OSError, ValueError):
+        result['package_version'] = None
+    import neural
+    import live_status
+    result['last_launch_graphics_api'] = neural.graphics_api()
+    result['last_launch_gpu'] = neural.gpu_name()
+    result['anticheat_service_now'] = live_status.anticheat_state()
+    try:
+        result['last_session'] = json.loads(live_status.session_path().read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        result['last_session'] = None
+    result['runtime_loader_note'] = ('The runtime starts when Endfield loads d3dcompiler_47.dll from the game folder. '
+                                     'A session that never reports a runtime either never loaded that library or had '
+                                     'the load blocked (anti-cheat or antivirus); see last_session.')
+    try:
+        result['dlss'] = neural.inspect(game)
+    except (OSError, ValueError) as error:
+        result['dlss'] = f'Not inspected: {error}'
     return result
+
+
+def _lines(path, count, head=False):
+    try:
+        text = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    except OSError as error:
+        return [f'({path.name} unreadable: {error})']
+    return text[:count] if head else text[-count:]
+
+
+def export_diagnostics(game):
+    """Write a shareable text report from read-only observations; nothing in the game changes."""
+    import neural
+    report = diagnostics(game)
+    local = os.environ.get('LOCALAPPDATA')
+    if not local:
+        raise ValueError('LOCALAPPDATA is not set; cannot choose a report location')
+    folder = Path(local) / 'EndfieldEnhancer'
+    folder.mkdir(parents=True, exist_ok=True)
+    now = datetime.datetime.now()
+    sections = [('Fate Engine diagnostics', [f'Generated {now.isoformat(timespec="seconds")}',
+                                             f'Game folder: {game}', f'App package: {package_directory()}']),
+                ('Installation and DLSS state', json.dumps(report, indent=2).splitlines())]
+    player = neural.player_log_path()
+    if player and player.is_file():
+        noise = ('streamline][error]', 'extension:', 'instance layer', 'supported format')
+        lines = [line for line in _lines(player, 400, head=True) if not any(word in line for word in noise)]
+        sections.append((f'Player.log head ({player})', lines[:40]))
+    for name, count in (('ReShade.log', 45), ('dlss5-bridge.log', 25)):
+        path = game / name
+        if path.is_file():
+            sections.append((f'{name} head', _lines(path, count, head=True)))
+            sections.append((f'{name} tail', _lines(path, 15)))
+    for log in sorted(folder.glob('runtime-*.log'), key=lambda path: path.stat().st_mtime, reverse=True)[:3]:
+        modified = datetime.datetime.fromtimestamp(log.stat().st_mtime).isoformat(timespec='seconds')
+        sections.append((f'{log.name} (modified {modified})', _lines(log, 40)))
+    text = ''.join(f'== {title} ==\n' + '\n'.join(lines) + '\n\n' for title, lines in sections)
+    path = folder / f'fate-engine-diagnostics-{now.strftime("%Y%m%d-%H%M%S")}.txt'
+    atomic_write(path, text.encode('utf-8'))
+    return {'status': 'exported', 'path': str(path),
+            'note': 'Attach this file when reporting a problem. It contains folder paths and log excerpts, not account data.'}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback', 'restore-recorded', 'neural-inspect', 'neural-install', 'neural-restore', 'neural-enable', 'neural-disable', 'neural-insert'])
+    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'export-diagnostics', 'upgrade', 'rollback', 'restore-recorded', 'neural-inspect', 'neural-install', 'neural-restore', 'neural-enable', 'neural-disable', 'neural-insert'])
     parser.add_argument('--game', type=Path)
     parser.add_argument('--package', type=Path, default=package_directory())
     group = parser.add_mutually_exclusive_group()
@@ -407,10 +471,15 @@ def main():
                 result = rollback(game)
             elif args.command == 'diagnostics':
                 result = diagnostics(game)
+            elif args.command == 'export-diagnostics':
+                result = export_diagnostics(game)
             else:
                 result = restore(game)
         print(json.dumps(result, indent=2))
         return 0
+    except PermissionError as exc:
+        parser.exit(3, f'Windows denied access: {exc}\nRun the manager as administrator, or grant your account '
+                       'write access to the game folder, then retry.\n')
     except (OSError, ValueError, KeyError, RuntimeError, configparser.Error) as exc:
         parser.exit(2, f'{exc}\n')
 

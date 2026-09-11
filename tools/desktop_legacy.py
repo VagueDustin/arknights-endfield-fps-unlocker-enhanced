@@ -29,6 +29,13 @@ def find_game():
     return ''
 
 
+def permission_message(error):
+    """Turn a raw WinError 5 into the action the user can actually take."""
+    return ('Windows denied write access to the game folder.\n' + str(error) +
+            '\n\nClose Fate Engine, right-click it and choose "Run as administrator", then repeat this step. '
+            'Game folders under Program Files that were not created by Epic or the game launcher usually need this.')
+
+
 class Panel:
     def __init__(self, window):
         self.window = window
@@ -222,16 +229,20 @@ class Panel:
                         result = manage.configure(game, graphics=manage.GRAPHICS_DEFAULTS)
                     elif action == 'rollback':
                         result = manage.rollback(game)
+                    elif action == 'export_diagnostics':
+                        result = manage.export_diagnostics(game)
                     else:
                         result = manage.diagnostics(game)
-                self.events.put((True, json.dumps(result, indent=2)))
+                self.events.put((True, json.dumps(result, indent=2), action))
+            except PermissionError as error:
+                self.events.put((False, permission_message(error), action))
             except Exception as error:
-                self.events.put((False, str(error)))
+                self.events.put((False, str(error), action))
         threading.Thread(target=worker, daemon=True).start()
 
     def poll(self):
         try:
-            success, result = self.events.get_nowait()
+            success, result = self.events.get_nowait()[:2]
             self.busy = False
             for button in self.buttons:
                 button.configure(state='normal')
