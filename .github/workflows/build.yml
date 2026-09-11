@@ -1,0 +1,29 @@
+name: Windows build and tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test compatibility and installer
+        run: python -m unittest discover -s tests -v
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Package
+        run: |
+          cmake --install build --config Release --prefix build/package
+          python tools/package_build.py build/package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EndfieldEnhancer-windows-x64-experimental
+          path: build/package/
