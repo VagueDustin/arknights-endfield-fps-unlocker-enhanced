@@ -1,6 +1,6 @@
 # Fate Engine - Arknights Endfield FPS Unlocker
 
-The 0.4.0 source introduces Fate Engine branding; the published 0.3.2 release still uses the name Endfield Enhancer. [Design review and installation options](docs/UI-REVIEW-0.4.0.md).
+[Download Fate Engine 0.4.4 for Windows](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases/tag/v0.4.4) - experimental prerelease. Includes the tested ReShade setup and DLSS 5 components. [Installation and in-game controls](docs/DLSS-RESHade-SETUP.md).
 
 ### [View interactive DLSS 5 comparisons](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
 
@@ -16,7 +16,7 @@ and other rendering modes remain unverified. This is still an experimental build
 
 ## DLSS 5 screenshot comparisons
 
-Neural rendering is working in the local experimental setup. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). DLSS 5 is not bundled in the published app yet.
+Neural rendering is working in the local experimental setup. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). The 0.4.4 bundled installer includes the tested components. Choose the DLSS 5 page for its three-step ReShade setup. Presets are controlled in the ReShade overlay with Home.
 
 **Off on the left, on on the right:**
 
@@ -77,6 +77,7 @@ These are separate user-supplied captures, not synchronized frames or a controll
 
 ## Features
 
+- DLSS 5 panel: inspect the tested setup, import user-supplied components, save next-launch settings, and remove managed addon files. [Setup and recovery](docs/DLSS5-SETUP.md).
 - 120, 144, 240, and unlimited presets; custom targets from 30-1000 FPS.
 - Optional background FPS cap; 0 disables the background override.
 - Independent VSync control and restoration of the value captured at startup.

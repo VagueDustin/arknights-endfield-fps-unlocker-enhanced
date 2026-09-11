@@ -16,4 +16,8 @@ Unused original source, resource files, prebuilt binaries, and vendored librarie
 - PyInstaller: its included license and bootloader distribution exception, collected from the installed distribution.
 - Inter and Cinzel font files: their included SIL Open Font License notices under `assets/fonts`, also installed with the app.
 
-These third-party notices do not transfer ownership of their contributions to VagueDustin Enterprises. Experimental DLSS 5 components are not bundled; their provenance and distribution terms must be checked separately before any future integration.
+These third-party notices do not transfer ownership of their contributions to VagueDustin Enterprises. Third-party rendering components retain their own licenses and permissions.
+
+## Bundled ReShade setup
+
+The 0.4.4 bundled release includes the official ReShade 6.8.0 full-addon setup and the tested neural components. The project maintainer confirmed permission to distribute the full bundle. ReShade is copyright Patrick Mours and distributed under BSD 3-clause terms; its complete notice accompanies the package under licenses/ReShade-BSD-3-Clause.txt. The DLSS 5 bridge by NIGos has its MIT license included separately. The Krish v4.55 RenoDX-family addon and NVIDIA neural runtime retain their authors' rights and distribution terms. They are not relicensed under Fate Engine's MIT license. Bundling does not imply endorsement by any of those authors.

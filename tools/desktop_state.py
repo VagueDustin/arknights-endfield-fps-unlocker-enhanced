@@ -35,6 +35,14 @@ def restore_recorded():
     restored = []
     for entry in data.get('games', []):
         game = Path(entry)
+        import native_neural
+        if (game / native_neural.STATE).exists():
+            native_neural.restore(game)
+            restored.append(entry + ' (native NR)')
+        import neural
+        if (game / neural.STATE).exists():
+            neural.restore(game)
+            restored.append(entry + ' (DLSS)')
         if manage.state_path(game).exists():
             with manage.locked(game):
                 manage.restore(game)

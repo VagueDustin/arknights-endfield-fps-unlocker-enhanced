@@ -343,7 +343,7 @@ def diagnostics(game):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback', 'restore-recorded'])
+    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback', 'restore-recorded', 'neural-inspect', 'neural-install', 'neural-restore', 'neural-enable', 'neural-disable', 'neural-insert'])
     parser.add_argument('--game', type=Path)
     parser.add_argument('--package', type=Path, default=package_directory())
     group = parser.add_mutually_exclusive_group()
@@ -369,6 +369,20 @@ def main():
         parser.error('--game is required')
     try:
         game = args.game.resolve(strict=True)
+        if args.command.startswith('neural-'):
+            import neural
+            if args.command == 'neural-inspect':
+                result = neural.inspect(game)
+            elif args.command == 'neural-install':
+                import desktop_state
+                desktop_state.remember(neural.game_path(game))
+                result = neural.install(game, args.package.resolve())
+            elif args.command == 'neural-restore':
+                result = neural.restore(game)
+            else:
+                result = neural.configure(game, enabled={'neural-enable': True, 'neural-disable': False}.get(args.command), insert=args.command == 'neural-insert')
+            print(json.dumps(result, indent=2))
+            return 0
         fps = PRESETS[args.preset] if args.preset else args.fps
         graphics = dict(GRAPHICS_PRESETS[args.graphics_preset]) if args.graphics_preset else {}
         for field, key in (('anisotropic', 'Anisotropic'), ('sharpening', 'Sharpening'),

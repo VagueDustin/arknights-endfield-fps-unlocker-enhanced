@@ -3,7 +3,11 @@
   #define PackageDir "..\build\package"
 #endif
 [Setup]
+#ifdef ValidationBuild
+AppId=FateEngine-NativeNR-IsolatedValidation
+#else
 AppId={{2F62B8B6-FA09-4D41-9871-3F5A92171C32}
+#endif
 AppName={#ProductName} - {#ProductSubtitle}
 AppVersion={#ProductVersion}
 AppPublisher=VagueDustin Enterprises
@@ -18,7 +22,23 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\build\installer
+#ifdef BundledReShade
+#ifdef ValidationBuild
+OutputBaseFilename=Fate-Engine-ReShade-Validation
+#else
 OutputBaseFilename=Fate-Engine-Arknights-Endfield-Setup-{#ProductVersion}
+#endif
+#else
+#ifdef PrivateNativeNR
+#ifdef ValidationBuild
+OutputBaseFilename=Fate-Engine-Native-NR-Validation
+#else
+OutputBaseFilename=Fate-Engine-Native-NR-Private-Setup-{#ProductVersion}
+#endif
+#else
+OutputBaseFilename=Fate-Engine-Arknights-Endfield-Setup-{#ProductVersion}
+#endif
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern dark
@@ -33,6 +53,15 @@ LicenseFile=..\LICENSE
 CloseApplications=yes
 RestartApplications=no
 [Files]
+#ifdef BundledReShade
+Source: "{#PackageDir}\prerequisites\*"; DestDir: "{app}\prerequisites"; Flags: ignoreversion
+Source: "{#PackageDir}\neural-components\*"; DestDir: "{app}\neural-components"; Flags: ignoreversion
+Source: "{#PackageDir}\reshade-payload.json"; DestDir: "{app}"; Flags: ignoreversion
+#endif
+Source: "..\docs\DLSS-RESHade-SETUP.md"; DestDir: "{app}"; Flags: ignoreversion
+#ifdef PrivateNativeNR
+Source: "{#PackageDir}\native-nr\*"; DestDir: "{app}\native-nr"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 Source: "{#PackageDir}\{#ProductExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\EndfieldManager.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
@@ -44,13 +73,17 @@ Source: "{#PackageDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignorevers
 Source: "..\assets\fonts\*-OFL.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\assets\identity\fate-engine.ico"; DestDir: "{app}"; Flags: ignoreversion
 [InstallDelete]
+#ifndef ValidationBuild
 Type: files; Name: "{autoprograms}\Endfield Enhancer\Endfield Enhancer.lnk"
 Type: files; Name: "{autodesktop}\Endfield Enhancer.lnk"
+#endif
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 [Icons]
+#ifndef ValidationBuild
 Name: "{group}\{#ProductName} - {#ProductSubtitle}"; Filename: "{app}\{#ProductExe}"; IconFilename: "{app}\fate-engine.ico"; AppUserModelID: "{#ProductAppId}"; Comment: "Arknights Endfield FPS unlocker and live graphics controls by VagueDustin Enterprises"
 Name: "{autodesktop}\{#ProductName} - {#ProductSubtitle}"; Filename: "{app}\{#ProductExe}"; IconFilename: "{app}\fate-engine.ico"; AppUserModelID: "{#ProductAppId}"; Tasks: desktopicon
+#endif
 [Run]
 Filename: "{app}\{#ProductExe}"; Description: "Open {#ProductName}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 [Code]

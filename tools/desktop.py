@@ -8,12 +8,15 @@ import queue
 import sys
 import threading
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import customtkinter as ctk
 from PIL import Image, ImageColor, ImageTk
 import manage
 import live_status
 import desktop_state
+import neural
+import reshade_setup
+import webbrowser
 from desktop_legacy import Panel as Actions, find_game
 
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent)) / 'assets'
@@ -54,6 +57,7 @@ class Panel(Actions):
         self.events = queue.Queue()
         self.live_events = queue.Queue()
         self.busy = False
+        self.game_running = False
         self.closed = threading.Event()
         self.buttons = []
         self.status = tk.StringVar(value='Local design preview - game files are unchanged.' if self.preview else 'Ready. Apply settings while the game is running.')
@@ -100,7 +104,7 @@ class Panel(Actions):
         rail.pack(side='left',fill='y',padx=(0,24));rail.pack_propagate(False)
         self.label(rail,'CONTROL CENTER',11,'text.faint').pack(anchor='w',pady=(16,18))
         content=ctk.CTkFrame(workspace,fg_color='transparent');content.pack(side='left',fill='both',expand=True)
-        self.pages={name:ctk.CTkFrame(content,fg_color='transparent') for name in ('Performance','Graphics','Recovery')}
+        self.pages={name:ctk.CTkFrame(content,fg_color='transparent') for name in ('Performance','Graphics','DLSS 5','Recovery')}
         self.navigation={}
         for name in self.pages:
             button=self.button(rail,name,lambda name=name:self.show_page(name),False)
@@ -109,9 +113,35 @@ class Panel(Actions):
         self.label(rail,'VERSION '+PRODUCT['version']+'\nEXPERIMENTAL',11,'text.faint',justify='left').pack(side='bottom',anchor='w',pady=22)
         self.label(rail,'Live settings\nLocal control\nReversible changes',12,'text.muted',justify='left').pack(side='bottom',anchor='w',pady=12)
         performance=self.pages['Performance'];graphics_tab=self.pages['Graphics'];recovery=self.pages['Recovery']
+        nr=ctk.CTkScrollableFrame(self.pages['DLSS 5'],fg_color=color('surface.base'))
+        nr.pack(fill='both',expand=True)
+        self.section(nr,'DLSS 5 with ReShade','Install once, then adjust the picture inside Endfield.')
+        self.section(nr,'1. Install ReShade','Close Endfield. The setup wizard will target Endfield.exe using Vulkan.')
+        self.reshade_button=self.button(nr,'Open ReShade setup',self.reshade_action)
+        self.reshade_button.pack(anchor='w',pady=6)
+        self.section(nr,'2. Install neural rendering','Install the tested addon, Vulkan bridge, and NVIDIA runtime after ReShade setup finishes.')
+        self.nr_setup_button=self.button(nr,'Install DLSS components',lambda:self.neural_action('install'))
+        self.nr_setup_button.pack(anchor='w',pady=6)
+        self.section(nr,'3. Launch through Epic','Enable DLSS in Endfield. Neural rendering starts off on a fresh setup.')
+        self.label(nr,'Insert - toggle neural rendering on or off\nHome - open ReShade, finish or skip the tutorial, then find the RenoDX DLSS 5 controls\nChoose styles and presets in that overlay. Press Home again to return to the game.',13,'text.muted',justify='left',wraplength=690).pack(anchor='w',pady=6)
+        self.label(nr,'NR can substantially reduce FPS. Compare the same scene with Insert before choosing a preset.',12,'text.muted',wraplength=690,justify='left').pack(anchor='w',pady=6)
+        row=ctk.CTkFrame(nr,fg_color='transparent');row.pack(fill='x',pady=8)
+        self.button(row,'Check setup',lambda:self.neural_action('inspect'),False).pack(side='left',padx=(0,8))
+        self.button(row,'Setup guide',self.neural_instructions,False).pack(side='left')
+        self.nr_output=ctk.CTkTextbox(nr,height=155,fg_color=color('surface.sunken'),font=('Inter',12))
+        self.nr_output.pack(fill='x',pady=8)
+        self.nr_output.insert('1.0','Choose Check setup to inspect installed components.');self.nr_output.configure(state='disabled')
+        maintenance=ctk.CTkFrame(nr,fg_color='transparent')
+        self.disclosure(nr,'repair and removal',maintenance).pack(anchor='w',pady=6)
+        anchor=ctk.CTkFrame(nr,height=1,fg_color='transparent');anchor.pack(fill='x');maintenance._pack_anchor=anchor
+        self.nr_write_buttons=[self.reshade_button,self.nr_setup_button]
+        for label,action in [('Set toggle to Insert','insert'),('Remove DLSS components','restore')]:
+            button=self.button(maintenance,label,lambda action=action:self.neural_action(action),False)
+            button.pack(anchor='w',pady=4);self.nr_write_buttons.append(button)
+        self.label(maintenance,'Close the game before setup, repair, or removal. ReShade itself is managed by its setup wizard. Removing components preserves your edited ReShade settings.',12,'text.muted',wraplength=690,justify='left').pack(anchor='w',pady=6)
         self.show_page('Performance')
         graphics=ctk.CTkScrollableFrame(graphics_tab,fg_color=color('surface.base'));graphics.pack(fill='both',expand=True)
-        self.section(performance,'Performance','Choose a frame-rate profile, then apply it without leaving your session.')
+        self.section(performance,'Performance','Set up the FPS unlocker below, then choose your frame-rate settings.')
         presets=ctk.CTkFrame(performance,fg_color='transparent'); presets.pack(fill='x',pady=16)
         for text,value in [('120 FPS','120'),('144 FPS','144'),('240 FPS','240'),('Unlimited','-1')]:
             self.button(presets,text,lambda value=value:self.fps.set(value),False).pack(side='left',padx=(0,10),expand=True,fill='x')
@@ -120,9 +150,9 @@ class Panel(Actions):
         self.field(performance,'VSync','Choose how frames synchronize with your display', self.vsync,
                    ['Game setting','Off','Every refresh','Every 2 refreshes','Every 3 refreshes','Every 4 refreshes'])
         self.label(performance,'The applied cap is reported by the runtime. It is not a measured FPS counter.',12,'text.muted').pack(anchor='w',pady=18)
-        self.section(graphics,'Graphics','Experimental controls. Game leaves each option under the game’s control.')
+        self.section(graphics,'Graphics','Requires FPS unlocker setup. Choose Game to keep Endfield\'s own setting.')
         profiles=ctk.CTkFrame(graphics,fg_color='transparent');profiles.pack(fill='x',pady=(4,8))
-        for label,name in [('Game defaults','game'),('Crisp','crisp'),('Supersample 125%','supersample')]:
+        for label,name in [('Game defaults','game'),('Crisp','crisp'),('Sharper (125%)','supersample')]:
             self.button(profiles,label,lambda name=name:self.show_graphics(manage.GRAPHICS_PRESETS[name]),False).pack(side='left',padx=(0,10))
         for key,title,hint,values in [
             ('Anisotropic','Anisotropic filtering','Texture filtering mode',self.graphics_choices['Anisotropic']),
@@ -133,26 +163,47 @@ class Panel(Actions):
             ('TemporalAA','Temporal anti-aliasing','Controls TAAU; does not select DLSS or FSR',self.graphics_choices['TemporalAA'])]:
             self.field(graphics,title,hint,self.graphics_vars[key],values)
         self.button(graphics,'Reset graphics to game settings',lambda:self.run('reset_graphics'),False).pack(anchor='w',pady=10)
-        self.section(recovery,'Recovery & diagnostics','Upgrade, restore the original game files, or return to the previous build.')
+        self.section(recovery,'FPS recovery & diagnostics','Restore the FPS unlocker files or return to a previous FPS build.')
+        self.label(recovery,'Manage neural rendering separately on the DLSS 5 page.',12,'text.muted').pack(anchor='w',pady=6)
         recoveryrow=ctk.CTkFrame(recovery,fg_color='transparent'); recoveryrow.pack(fill='x',pady=16)
-        for label,action in [('Inspect installation','inspect'),('Previous build','rollback'),('Restore game files','restore')]:
+        for label,action in [('Inspect installation','inspect'),('Previous build','rollback'),('Remove FPS unlocker','restore')]:
             self.button(recoveryrow,label,lambda action=action:self.run(action),False).pack(side='left',padx=(0,10))
         self.output=ctk.CTkTextbox(recovery,fg_color=color('surface.sunken'),text_color=color('text.muted'),font=('Inter',12),height=220)
-        self.output.pack(fill='both',expand=True); self.output.configure(state='disabled')
+        self.output.pack(fill='both',expand=True)
+        self.output.insert('1.0','Select Inspect installation to check the FPS unlocker and its recovery files.')
+        self.output.configure(state='disabled')
         self.runtime_output=ctk.CTkTextbox(recovery,fg_color=color('surface.sunken'),text_color=color('text.muted'),font=('Inter',11),height=120)
         self.runtime_output.pack(fill='x',pady=(8,0)); self.runtime_output.configure(state='disabled')
-        bottom=ctk.CTkFrame(window,fg_color=color('surface.raised'),corner_radius=0)
+        self.bottom=bottom=ctk.CTkFrame(window,fg_color=color('surface.raised'),corner_radius=0)
         bottom.pack(fill='x',pady=(10,0))
         self.label(bottom,'',12,'text.muted',textvariable=self.status,wraplength=590).pack(side='left',padx=24,pady=16)
-        self.button(bottom,'Apply live settings',lambda:self.run('configure')).pack(side='right',padx=(8,24),pady=16)
-        self.button(bottom,'Install / update',lambda:self.run('install'),False).pack(side='right',pady=16)
+        self.game_apply=self.button(bottom,'Apply game settings',lambda:self.run('configure'))
+        self.game_apply.pack(side='right',padx=(8,24),pady=16)
+        self.game_setup=self.button(bottom,'Set up FPS unlocker',lambda:self.run('install'),False)
+        self.game_setup.pack(side='right',pady=16)
         self.label(window,f"Provided by VagueDustin Enterprises™ · © {datetime.date.today().year} {PRODUCT['name']}. All rights reserved.",11,'text.faint').pack(pady=10)
         self.load_profile()
         if not self.preview and manage.state_path(Path(self.game.get())).exists():
             desktop_state.remember(Path(self.game.get()))
         window.after(100,self.poll)
+        window.after(500,lambda:self.neural_action('inspect') if not self.busy else None)
         threading.Thread(target=self.watch,daemon=True).start()
+    def disclosure(self,parent,title,frame):
+        frame._title=title
+        frame._toggle_button=self.button(parent,'Show '+title,lambda:self.toggle_section(frame),False)
+        return frame._toggle_button
+    def toggle_section(self,frame):
+        if frame.winfo_manager():
+            frame.pack_forget();frame._toggle_button.configure(text='Show '+frame._title)
+        else:
+            frame.pack(fill='x',before=frame._pack_anchor,pady=6);frame._toggle_button.configure(text='Hide '+frame._title)
     def show_page(self,name):
+        self.active_page=name
+        if hasattr(self,'bottom'):
+            self.game_apply.pack_forget();self.game_setup.pack_forget()
+            if name in ('Performance','Graphics'):
+                self.game_apply.pack(side='right',padx=(8,24),pady=16)
+                self.game_setup.pack(side='right',pady=16)
         for page in self.pages.values():page.pack_forget()
         self.pages[name].pack(fill='both',expand=True)
         for key,button in self.navigation.items():
@@ -163,10 +214,55 @@ class Panel(Actions):
             self.status.set('Design preview only. Applying or installing is disabled in this preview.')
             return
         super().run(action)
+    def neural_action(self,action):
+        if self.busy:
+            return
+        if self.preview and action != 'inspect':
+            self.status.set('Design preview: DLSS writes are disabled.')
+            return
+        game=self.game.get()
+        source=None
+        if action=='install':
+            source=reshade_setup.component_folder()
+            if source is None:source=filedialog.askdirectory(title='Folder containing the three tested DLSS components')
+            if not source:
+                return
+        self.busy=True
+        for button in self.buttons:button.configure(state='disabled')
+        self.status.set('Checking DLSS...' if action=='inspect' else 'Updating DLSS files...')
+        def worker():
+            try:
+                if action=='install':
+                    # Record before mutation so an interrupted install remains recoverable.
+                    desktop_state.remember(neural.game_path(game))
+                    result=neural.install(game,source)
+                elif action=='restore':result=neural.restore(game)
+                elif action=='inspect':result=neural.inspect(game)
+                else:result=neural.configure(game,enabled={'enable':True,'disable':False}.get(action),insert=action=='insert')
+                if action!='inspect':result['status']=neural.inspect(game)
+                self.events.put((True,neural.summary(result),'neural'))
+            except Exception as error:
+                self.events.put((False,str(error),'neural'))
+        threading.Thread(target=worker,daemon=True).start()
+    def reshade_action(self):
+        if self.busy or self.preview:return
+        try:
+            result=reshade_setup.launch(self.game.get())
+            self.status.set(result)
+        except Exception as error:messagebox.showerror('ReShade setup',str(error))
+    def neural_instructions(self):
+        messagebox.showinfo('DLSS 5 setup guide',
+            '1. Close Endfield and select Open ReShade setup. Use the full addon build and Vulkan. Complete the official wizard; extra shader packs are optional.\n\n'
+            '2. Return here and select Install DLSS components. The bundled release includes the tested files. Source-only builds ask you to select your downloaded components.\n\n'
+            '3. Launch through Epic and enable DLSS in Endfield. Press Home to finish or skip the ReShade tutorial. Find the RenoDX DLSS 5 controls for styles, presets, and strength.\n\n'
+            '4. Press Home to close the overlay. Insert toggles NR. On a fresh setup NR starts off. The overlay may lower FPS while open.\n\n'
+            'To remove: close Endfield, remove DLSS components here, then run ReShade setup for the same game and choose Uninstall.\n\n'
+            'Fate Engine checks files and saved settings; it does not measure whether neural rendering is active.')
     def label(self,parent,text,size=14,role='text.primary',display=False,**kw):
         return ctk.CTkLabel(parent,text=text,text_color=color(role),font=('Inter',size,'bold' if display else 'normal'),**kw)
     def button(self,parent,text,command,primary=True):
         button=ctk.CTkButton(parent,text=text,command=command,height=38,corner_radius=7,font=('Inter',13),
+            width=max(140,min(270,len(text)*7+28)),text_color_disabled=color('text.muted'),
             fg_color=color('accent.default' if primary else 'surface.highest'),hover_color=color('accent.hover' if primary else 'surface.overlay'),
             text_color=color('text.inverse' if primary else 'text.primary'),border_width=0 if primary else 1,border_color=color('border.default'))
         self.buttons.append(button); return button
@@ -186,28 +282,44 @@ class Panel(Actions):
                 text_color=color('text.primary'),dropdown_fg_color=color('surface.raised'),dropdown_text_color=color('text.primary'),dropdown_hover_color=color('surface.highest'))
         else: widget=self.entry(row,variable)
         widget.pack(side='right',padx=16,pady=9)
+    def update_nr_availability(self):
+        for button in self.nr_write_buttons:
+            button.configure(state='disabled' if self.busy or self.game_running or self.preview else 'normal')
+        fps_installed=manage.state_path(Path(self.game.get())).exists()
+        self.game_setup.configure(text='Update FPS unlocker' if fps_installed else 'Set up FPS unlocker',state='disabled' if self.busy or self.game_running or self.preview else 'normal')
+        self.game_apply.configure(text='Apply game settings' if self.game_running else 'Save game settings',state='normal' if fps_installed and not self.busy and not self.preview else 'disabled')
+        for button in (self.nr_setup_button,self.game_apply):
+            button.configure(fg_color=color('surface.highest' if button.cget('state')=='disabled' else 'accent.default'))
     def watch(self):
         while not self.closed.is_set():
-            try: self.live_events.put(live_status.snapshot())
+            try:
+                data=live_status.snapshot()
+                self.live_events.put(data)
             except Exception as error: self.live_events.put({'error':str(error)})
             self.closed.wait(2)
     def poll(self):
         try:
-            success,result=self.events.get_nowait();self.busy=False
+            event=self.events.get_nowait();success,result=event[:2];self.busy=False
             for button in self.buttons:button.configure(state='normal')
-            self.status.set('Settings saved. Check runtime status for confirmation.' if success else 'Action stopped. Details are in Recovery & logs.')
-            self.output.configure(state='normal');self.output.delete('1.0','end');self.output.insert('1.0',result);self.output.configure(state='disabled')
-            if success:self.load_profile()
+            is_neural=len(event)>2 and event[2]=='neural'
+            self.status.set(('DLSS setup checked.' if is_neural else 'Game settings updated.') if success else 'Could not complete the action. See the status panel for details.')
+            if is_neural:
+                self.nr_output.configure(state='normal');self.nr_output.delete('1.0','end');self.nr_output.insert('1.0',result);self.nr_output.configure(state='disabled')
+            if not is_neural:
+                self.output.configure(state='normal');self.output.delete('1.0','end');self.output.insert('1.0',result);self.output.configure(state='disabled')
+            if success and not is_neural:self.load_profile()
         except queue.Empty:pass
         try:
             data=self.live_events.get_nowait()
             if 'error' in data:self.callback_badge.configure(text='Runtime status unavailable')
             else:
                 self.live_badge.configure(text=f"● GAME RUNNING  ·  {data['pid']}" if data['running'] else 'WAITING FOR GAME',text_color=color('status.live' if data['running'] else 'text.muted'))
+                self.game_running=data['running']
                 cap=data['cap'];self.cap_badge.configure(text='Applied cap -' if cap is None else ('Uncapped' if cap==-1 else f'{cap} FPS applied cap'))
                 self.callback_badge.configure(text=data['graphics'])
                 self.runtime_output.configure(state='normal');self.runtime_output.delete('1.0','end');self.runtime_output.insert('1.0','\n'.join(data['lines']));self.runtime_output.configure(state='disabled');self.runtime_output.see('end')
         except queue.Empty:pass
+        self.update_nr_availability()
         self.window.after(150,self.poll)
     def close(self):
         if self.busy:messagebox.showinfo('Action in progress','Wait for the current action to finish before closing.')
