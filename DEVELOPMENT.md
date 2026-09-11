@@ -68,8 +68,9 @@ methods instead of raw backing-field writes; their behavior is not established
 by declarations. Runtime generic types, value constraints, change notifications,
 and exact reset behavior must be validated before using them.
 
-Unity Application.InvokeOnBeforeRender is present with no managed arguments and
-is now the graphics dispatch entry point. Its signature is validated before
+Unity Application.InvokeOnBeforeRender was present but did not fire in gameplay.
+Graphics dispatch now uses RenderPipelineManager.DoRenderLoop_Internal with
+three validated arguments: RenderPipelineAsset, IntPtr, and UnityEngine.Object. Its signature is validated before
 hooking; execution is logged and bound to the first callback thread. No callback
 means no graphics writes. Each parameter is resolved independently and retained
 with a GC handle while overridden. Values are captured and read back through
@@ -87,3 +88,12 @@ python tools/inspect_graphics_metadata.py 'C:\path\to\global-metadata.dat' --typ
 
 Raw inspection results remain in ignored local-reports. Do not commit or upload
 the game's metadata or runtime binaries.
+
+## Desktop development
+
+Install customtkinter==5.2.2 and Pillow, then run `python tools/desktop.py`.
+The theme snapshot and bundled OFL fonts live in assets/. Product colors resolve
+semantic roles from brand.json. The app uses the existing locked manager for
+mutations; its background status watcher only reads process IDs and bounded log tails.
+Run `python tools/desktop.py --smoke-test` for a startup check. CI builds the
+standalone executable and Inno Setup installer, including font and library notices.

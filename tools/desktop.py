@@ -102,6 +102,9 @@ class Panel(Actions):
                    ['Game setting','Off','Every refresh','Every 2 refreshes','Every 3 refreshes','Every 4 refreshes'])
         self.label(performance,'The applied cap is reported by the runtime. It is not a measured FPS counter.',12,'text.muted').pack(anchor='w',pady=18)
         self.section(graphics,'Tune the view.','Experimental controls. Game leaves each option under the game’s control.')
+        profiles=ctk.CTkFrame(graphics,fg_color='transparent');profiles.pack(fill='x',pady=(4,8))
+        for label,name in [('Game defaults','game'),('Crisp','crisp'),('Supersample 125%','supersample')]:
+            self.button(profiles,label,lambda name=name:self.show_graphics(manage.GRAPHICS_PRESETS[name]),False).pack(side='left',padx=(0,10))
         for key,title,hint,values in [
             ('Anisotropic','Anisotropic filtering','Texture filtering mode',self.graphics_choices['Anisotropic']),
             ('Sharpening','Sharpening','Game or 0–100 percent',None),

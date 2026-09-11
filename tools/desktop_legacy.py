@@ -193,12 +193,13 @@ class Panel:
             game = Path(self.game.get()).resolve(strict=True)
             if not (game / 'Endfield.exe').is_file():
                 raise ValueError('Select the folder containing Endfield.exe')
-            fps = int(self.fps.get())
-            background = int(self.background.get())
-            vsync = ['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes',
-                     'Every 3 refreshes', 'Every 4 refreshes'].index(self.vsync.get()) - 1
-            graphics_values = self.graphics_values()
-            config = manage.settings(fps, background, vsync, graphics_values)
+            if action in ('install', 'configure'):
+                fps = int(self.fps.get())
+                background = int(self.background.get())
+                vsync = ['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes',
+                         'Every 3 refreshes', 'Every 4 refreshes'].index(self.vsync.get()) - 1
+                graphics_values = self.graphics_values()
+                config = manage.settings(fps, background, vsync, graphics_values)
         except (ValueError, OSError) as error:
             messagebox.showerror('Check settings', str(error))
             return

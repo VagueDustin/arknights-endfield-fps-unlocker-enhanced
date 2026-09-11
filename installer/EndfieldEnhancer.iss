@@ -36,13 +36,12 @@ Name: "{autodesktop}\Endfield Enhancer"; Filename: "{app}\EndfieldEnhancer.exe";
 [Run]
 Filename: "{app}\EndfieldEnhancer.exe"; Description: "Open Endfield Enhancer"; Flags: nowait postinstall skipifsilent
 [Code]
-function InitializeUninstall(): Boolean;
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var ResultCode: Integer;
 begin
-  Result := False;
+  if CurUninstallStep <> usUninstall then Exit;
   if not Exec(ExpandConstant('{app}\EndfieldManager.exe'), 'restore-recorded', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    MsgBox('Could not start game restoration. Open Endfield Enhancer and restore the game files before uninstalling.', mbError, MB_OK)
+    RaiseException('Could not start game restoration. Open Endfield Enhancer and restore the game files before uninstalling.')
   else if ResultCode <> 0 then
-    MsgBox('Game restoration stopped. Close Endfield, then use Recovery & logs in Endfield Enhancer to restore the game files. The app has not been removed.', mbError, MB_OK)
-  else Result := True;
+    RaiseException('Game restoration stopped. Close Endfield, then use Recovery & logs in Endfield Enhancer to restore the game files. The app has not been removed.');
 end;

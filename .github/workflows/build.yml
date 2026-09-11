@@ -36,6 +36,17 @@ jobs:
           if ($app.ExitCode -ne 0) { throw "Desktop smoke test failed" }
       - name: Build Windows installer
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/EndfieldEnhancer.iss'
+      - name: Verify setup and uninstall
+        run: |
+          $setup = Get-ChildItem build/installer/*.exe | Select-Object -First 1
+          $target = Join-Path $env:RUNNER_TEMP 'EndfieldSetupTest'
+          $install = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', ('/DIR="' + $target + '"') -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Setup failed' }
+          $app = Start-Process (Join-Path $target 'EndfieldEnhancer.exe') -ArgumentList '--smoke-test' -WindowStyle Hidden -Wait -PassThru
+          if ($app.ExitCode -ne 0) { throw 'Installed app startup failed' }
+          $remove = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw 'Uninstall failed' }
+          if (Test-Path (Join-Path $target 'EndfieldEnhancer.exe')) { throw 'App remains after uninstall' }
       - uses: actions/upload-artifact@v4
         with:
           name: EndfieldEnhancer-windows-x64-experimental
