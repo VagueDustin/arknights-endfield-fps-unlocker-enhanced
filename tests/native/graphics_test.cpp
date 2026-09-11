@@ -30,6 +30,10 @@ int main(int argc, char** argv) {
         Function<void (*)()>(fake, "BadCallbackSignature")();
         return Graphics::Initialize(fake, true, Log) ? 4 : 0;
     }
+    if (argc > 1 && !std::strcmp(argv[1], "reference")) {
+        Function<void (*)()>(fake, "BadCallbackReference")();
+        return Graphics::Initialize(fake, true, Log) ? 12 : 0;
+    }
     if (!Graphics::Initialize(fake, true, Log)) return 5;
     Graphics::Config config{2, 20, 125, 2048, 0, 0};
     Graphics::Publish(config);

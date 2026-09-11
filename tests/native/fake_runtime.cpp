@@ -10,7 +10,7 @@ static volatile LONG fps = 60, vsync = 1, aniso = 1, badThread = 0, frames = 0;
 static thread_local bool attached = false;
 static DWORD graphicsThread = 0;
 static std::string rejected, wrongType;
-static bool badCallback = false;
+static bool badCallback = false, badReference = false;
 EXPORT __declspec(noinline) void SetFps(int value, const void*) { InterlockedExchange(&fps, value); }
 EXPORT __declspec(noinline) void SetVsync(int value, const void*) { InterlockedExchange(&vsync, value); }
 EXPORT __declspec(noinline) void BeforeRender(void*, void*, void*, const void*) { InterlockedIncrement(&frames); }
@@ -22,6 +22,7 @@ EXPORT int BadThread() { return static_cast<int>(badThread); }
 EXPORT void SetGraphicsThread() { graphicsThread = GetCurrentThreadId(); attached = true; }
 EXPORT void RejectSetting(const char* name) { rejected = name; }
 EXPORT void WrongType(const char* name) { wrongType = name; }
+EXPORT void BadCallbackReference() { badReference = true; }
 EXPORT void BadCallbackSignature() { badCallback = true; }
 
 struct Class { const char* name; const char* space; };
@@ -157,7 +158,7 @@ EXPORT void* il2cpp_class_get_parent(void*) { return nullptr; }
 EXPORT const char* il2cpp_class_get_name(void* klass) { return static_cast<Class*>(klass)->name; }
 EXPORT const char* il2cpp_class_get_namespace(void* klass) { return static_cast<Class*>(klass)->space; }
 EXPORT const void* il2cpp_method_get_return_type(void* method) { return &static_cast<Method*>(method)->returnType; }
-EXPORT const void* il2cpp_method_get_param(void* method, unsigned index) { static int types[] = {0x12, 0x18, 0x12}; if (method == &frame) return &types[index]; return &static_cast<Method*>(method)->parameterType; }
+EXPORT const void* il2cpp_method_get_param(void* method, unsigned index) { static int types[] = {0x12, 0x18, 0x15}; if (method == &frame) return &types[index]; return &static_cast<Method*>(method)->parameterType; }
 EXPORT unsigned il2cpp_method_get_param_count(void* method) { if (method == &frame) return 3; return static_cast<Method*>(method)->parameterType < 0 ? 0 : 1; }
 EXPORT unsigned il2cpp_method_get_flags(void* method, unsigned* ignored) { *ignored = 0; return static_cast<Method*>(method)->isStatic ? 0x10 : 0; }
 EXPORT int il2cpp_type_get_type(const void* type) { return *static_cast<const int*>(type); }
@@ -166,3 +167,6 @@ EXPORT int il2cpp_string_length(void* text) { return static_cast<int>(static_cas
 EXPORT unsigned il2cpp_gchandle_new(void* object, bool) { const auto handle = nextHandle++; handles[handle] = object; return handle; }
 EXPORT void* il2cpp_gchandle_get_target(unsigned handle) { return handles.at(handle); }
 EXPORT void il2cpp_gchandle_free(unsigned handle) { handles.erase(handle); }
+
+EXPORT void* il2cpp_class_from_type(const void*) { return &app; }
+EXPORT bool il2cpp_class_is_valuetype(void*) { return badReference; }

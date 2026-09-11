@@ -1,4 +1,4 @@
-#define AppVersion "0.3.1"
+#define AppVersion "0.3.2"
 [Setup]
 AppId={{2F62B8B6-FA09-4D41-9871-3F5A92171C32}
 AppName=Arknights Endfield FPS Unlocker Enhanced

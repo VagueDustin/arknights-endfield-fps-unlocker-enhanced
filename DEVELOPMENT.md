@@ -70,7 +70,9 @@ and exact reset behavior must be validated before using them.
 
 Unity Application.InvokeOnBeforeRender was present but did not fire in gameplay.
 Graphics dispatch now uses RenderPipelineManager.DoRenderLoop_Internal with
-three validated arguments: RenderPipelineAsset, IntPtr, and UnityEngine.Object. Its signature is validated before
+three validated arguments: RenderPipelineAsset, IntPtr, and a managed reference.
+The game reports a generic instance for argument three; the class must not be
+a value type. The hook forwards all original arguments without inspecting them. Its signature is validated before
 hooking; execution is logged and bound to the first callback thread. No callback
 means no graphics writes. Each parameter is resolved independently and retained
 with a GC handle while overridden. Values are captured and read back through

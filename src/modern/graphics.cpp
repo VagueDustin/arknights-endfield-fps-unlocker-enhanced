@@ -32,6 +32,8 @@ struct Api {
     unsigned (*paramCount)(void*);
     unsigned (*flags)(void*, unsigned*);
     int (*type)(const void*);
+    void* (*classFromType)(const void*);
+    bool (*valueType)(void*);
     void* (*newString)(const wchar_t*, int);
     unsigned (*newHandle)(void*, bool);
     void* (*handleTarget)(unsigned);
@@ -103,6 +105,13 @@ bool Signature(void* method, int result, bool isStatic, int parameter = -1) {
     if (((api.flags(method, &ignored) & 0x10) != 0) != isStatic) return false;
     return api.type(api.returnType(method)) == result &&
         (parameter < 0 || api.type(api.paramType(method, 0)) == parameter);
+}
+bool ManagedReference(const void* type) {
+    const int kind = api.type(type);
+    if (kind == 0x12 || kind == 0x1c) return true;
+    if (kind != 0x15) return false;
+    void* klass = api.classFromType(type);
+    return klass && !api.valueType(klass);
 }
 bool Invoke(void* method, void* object, void** parameters, void*& result) {
     if (!method) return false;
@@ -365,16 +374,18 @@ bool Initialize(HMODULE module, bool knownRuntime, Logger logger) {
     RESOLVE(classNamespace, "il2cpp_class_get_namespace") RESOLVE(returnType, "il2cpp_method_get_return_type")
     RESOLVE(paramType, "il2cpp_method_get_param") RESOLVE(paramCount, "il2cpp_method_get_param_count")
     RESOLVE(flags, "il2cpp_method_get_flags") RESOLVE(type, "il2cpp_type_get_type")
+    RESOLVE(classFromType, "il2cpp_class_from_type") RESOLVE(valueType, "il2cpp_class_is_valuetype")
     RESOLVE(newString, "il2cpp_string_new_utf16") RESOLVE(newHandle, "il2cpp_gchandle_new")
     RESOLVE(handleTarget, "il2cpp_gchandle_get_target") RESOLVE(freeHandle, "il2cpp_gchandle_free")
 #undef RESOLVE
     void* frame = Method(Class("UnityEngine.Rendering", "RenderPipelineManager"), "DoRenderLoop_Internal", 3);
     unsigned ignoredFlags = 0;
-    // Shipping Unity signature: static void(RenderPipelineAsset, IntPtr, Object).
+    // This game uses a generic reference as the third argument. Reference arguments
+    // share the pointer ABI; generic value types must never pass this check.
     // Do not guess the ABI when the game changes this entry point.
     if (!frame || api.paramCount(frame) != 3 || api.type(api.returnType(frame)) != 0x01 ||
         !(api.flags(frame, &ignoredFlags) & 0x10) || api.type(api.paramType(frame, 0)) != 0x12 ||
-        api.type(api.paramType(frame, 1)) != 0x18 || api.type(api.paramType(frame, 2)) != 0x12 ||
+        api.type(api.paramType(frame, 1)) != 0x18 || !ManagedReference(api.paramType(frame, 2)) ||
         !*static_cast<void**>(frame)) {
         if (frame) {
             std::string types;
