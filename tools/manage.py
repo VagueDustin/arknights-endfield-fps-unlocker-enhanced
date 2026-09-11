@@ -20,6 +20,13 @@ PAYLOAD = 'endfield_fps.dll'
 CONFIG = 'endfield-enhancer.ini'
 OWNED = (COMPILER, ORIGINAL, PAYLOAD, CONFIG)
 PRESETS = {'balanced': 120, 'high-refresh': 144, '240hz': 240, 'unlimited': -1}
+GRAPHICS_DEFAULTS = dict.fromkeys(('Anisotropic', 'Sharpening', 'RenderScale',
+                                  'ShadowResolution', 'AmbientOcclusion', 'TemporalAA'), -1)
+GRAPHICS_PRESETS = {
+    'game': dict(GRAPHICS_DEFAULTS),
+    'crisp': dict(GRAPHICS_DEFAULTS, Anisotropic=2, Sharpening=20),
+    'supersample': dict(GRAPHICS_DEFAULTS, Anisotropic=2, RenderScale=125),
+}
 
 
 def package_directory():
@@ -107,15 +114,32 @@ def locked(game):
         kernel.CloseHandle(handle)
 
 
-def settings(target=120, background=0, vsync=0):
+def settings(target=120, background=0, vsync=0, graphics=None):
     if target != -1 and not 30 <= target <= 1000:
         raise ValueError('FPS must be 30–1000, or -1 for unlimited')
     if background != 0 and not 30 <= background <= 1000:
         raise ValueError('Background FPS must be 0 (disabled) or 30–1000')
     if not -1 <= vsync <= 4:
         raise ValueError('VSync must be -1 (game setting) or 0–4')
-    return (f'[FPS]\nTarget={target}\nBackground={background}\nVSync={vsync}\n'
-            '\n[Graphics]\n; Overrides remain disabled until individually validated.\nEnabled=0\n').encode('ascii')
+    values = dict(GRAPHICS_DEFAULTS)
+    if graphics:
+        if set(graphics) - set(values):
+            raise ValueError('Unknown graphics setting')
+        values.update(graphics)
+    if not all(isinstance(value, int) for value in values.values()):
+        raise ValueError('Graphics settings must be integers')
+    if values['Anisotropic'] not in (-1, 0, 1, 2):
+        raise ValueError('Anisotropic filtering: -1 game, 0 off, 1 per-texture, 2 forced on')
+    if not -1 <= values['Sharpening'] <= 100:
+        raise ValueError('Sharpening must be -1 (game) or 0–100 percent')
+    if values['RenderScale'] != -1 and not 50 <= values['RenderScale'] <= 200:
+        raise ValueError('Render scale must be -1 (game) or 50–200 percent')
+    if values['ShadowResolution'] not in (-1, 512, 1024, 2048, 4096):
+        raise ValueError('Shadow resolution must be -1, 512, 1024, 2048, or 4096')
+    if any(values[key] not in (-1, 0, 1) for key in ('AmbientOcclusion', 'TemporalAA')):
+        raise ValueError('AO and TAAU must be -1 (game), 0 (off), or 1 (on)')
+    return (f'[FPS]\nTarget={target}\nBackground={background}\nVSync={vsync}\n\n[Graphics]\n' +
+            ''.join(f'{key}={value}\n' for key, value in values.items())).encode('ascii')
 
 
 def state_path(game):
@@ -224,7 +248,7 @@ def restore(game):
     return {'status': 'restored', 'backup_directory': destination.name}
 
 
-def configure(game, target=None, background=None, vsync=None):
+def configure(game, target=None, background=None, vsync=None, graphics=None):
     state, manifest = read_state(game)
     if manifest['phase'] != 'installed':
         raise ValueError('Incomplete installation; run restore first')
@@ -232,11 +256,66 @@ def configure(game, target=None, background=None, vsync=None):
     parser = configparser.ConfigParser()
     parser.read(game / CONFIG)
     old = parser['FPS']
+    current_graphics = {key: parser.getint('Graphics', key, fallback=-1) for key in GRAPHICS_DEFAULTS}
+    if graphics:
+        current_graphics.update(graphics)
     data = settings(old.getint('Target') if target is None else target,
                     old.getint('Background') if background is None else background,
-                    old.getint('VSync') if vsync is None else vsync)
+                    old.getint('VSync') if vsync is None else vsync, current_graphics)
     atomic_write(game / CONFIG, data)
-    return {'status': 'configured', 'note': 'Runtime reloads within one second. Graphics overrides remain disabled.'}
+    return {'status': 'configured', 'graphics': current_graphics,
+            'note': 'FPS reloads within one second; graphics apply at a render callback after compatibility checks. See runtime log for readback.'}
+
+
+def upgrade(game, package, config=None):
+    game_idle()
+    state, manifest = read_state(game)
+    if manifest['phase'] != 'installed':
+        raise ValueError('Incomplete installation; restore before upgrading')
+    # Validate the new package before touching the current installation.
+    incoming = json.loads((package / 'package.json').read_text())
+    if set(incoming['files']) != {COMPILER, PAYLOAD}:
+        raise ValueError('Invalid upgrade package')
+    for name, expected in incoming['files'].items():
+        if digest(package / name) != expected:
+            raise ValueError('Upgrade package checksum mismatch')
+    if set(pe_exports(state / 'original.bin', details=True)) != set(pe_exports(package / COMPILER, details=True)):
+        raise ValueError('Compiler export mismatch in upgrade package')
+    for name in OWNED:
+        regular(game / name)
+        if name != CONFIG and digest(game / name) != manifest['installed'][name]:
+            raise ValueError(f'{name} changed; upgrade stopped')
+    previous = state / 'previous-package'
+    previous.mkdir(exist_ok=False)
+    old_config = (game / CONFIG).read_bytes()
+    for name in (COMPILER, PAYLOAD):
+        atomic_write(previous / name, (game / name).read_bytes())
+    atomic_write(previous / 'package.json', json.dumps({'version': 'previous-build', 'files': {
+        name: manifest['installed'][name] for name in (COMPILER, PAYLOAD)}}).encode())
+    restored = restore(game)
+    archived = game / restored['backup_directory']
+    try:
+        result = install(game, package, old_config if config is None else config)
+    except Exception as error:
+        if not state_path(game).exists():
+            install(game, archived / 'previous-package', old_config)
+        raise RuntimeError(f'Upgrade failed; previous build restored when possible: {error}') from error
+    new_state, new_manifest = read_state(game)
+    new_manifest['previous_archive'] = archived.name
+    atomic_write(new_state / 'manifest.json', json.dumps(new_manifest, indent=2).encode())
+    result['previous_build_backup'] = archived.name
+    return result
+
+
+def rollback(game):
+    _, manifest = read_state(game)
+    archive = manifest.get('previous_archive', '')
+    if not archive.startswith(STATE + '-restored') or Path(archive).name != archive:
+        raise ValueError('No previous build is recorded')
+    previous = game / archive
+    if previous.resolve().parent != game.resolve():
+        raise ValueError('Invalid previous-build path')
+    return upgrade(game, previous / 'previous-package', (previous / 'last-config.ini').read_bytes())
 
 
 def diagnostics(game):
@@ -261,7 +340,7 @@ def diagnostics(game):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics'])
+    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback'])
     parser.add_argument('--game', type=Path)
     parser.add_argument('--package', type=Path, default=package_directory())
     group = parser.add_mutually_exclusive_group()
@@ -269,17 +348,24 @@ def main():
     group.add_argument('--fps', type=int)
     parser.add_argument('--background', type=int)
     parser.add_argument('--vsync', type=int)
+    parser.add_argument('--graphics-preset', choices=GRAPHICS_PRESETS)
+    for option in ('anisotropic', 'sharpening', 'render-scale', 'shadow-resolution', 'ambient-occlusion', 'temporal-aa'):
+        parser.add_argument('--' + option, type=int)
     args = parser.parse_args()
     if args.command == 'profiles':
-        print(json.dumps({'fps_presets': PRESETS, 'graphics': {
-            name: 'disabled: no validated implementation for this build'
-            for name in ('anti_aliasing', 'shadows', 'ambient_occlusion', 'render_scale')}}, indent=2))
+        print(json.dumps({'fps_presets': PRESETS, 'graphics_presets': GRAPHICS_PRESETS}, indent=2))
         return 0
     if not args.game:
         parser.error('--game is required')
     try:
         game = args.game.resolve(strict=True)
         fps = PRESETS[args.preset] if args.preset else args.fps
+        graphics = dict(GRAPHICS_PRESETS[args.graphics_preset]) if args.graphics_preset else {}
+        for field, key in (('anisotropic', 'Anisotropic'), ('sharpening', 'Sharpening'),
+                           ('render_scale', 'RenderScale'), ('shadow_resolution', 'ShadowResolution'),
+                           ('ambient_occlusion', 'AmbientOcclusion'), ('temporal_aa', 'TemporalAA')):
+            if getattr(args, field) is not None:
+                graphics[key] = getattr(args, field)
         with locked(game):
             if args.command == 'inspect':
                 result = inspect(game)
@@ -288,16 +374,20 @@ def main():
                 result = install(game, args.package.resolve(), settings(
                     120 if fps is None else fps,
                     0 if args.background is None else args.background,
-                    0 if args.vsync is None else args.vsync))
+                    0 if args.vsync is None else args.vsync, graphics))
             elif args.command == 'configure':
-                result = configure(game, fps, args.background, args.vsync)
+                result = configure(game, fps, args.background, args.vsync, graphics)
+            elif args.command == 'upgrade':
+                result = upgrade(game, args.package.resolve())
+            elif args.command == 'rollback':
+                result = rollback(game)
             elif args.command == 'diagnostics':
                 result = diagnostics(game)
             else:
                 result = restore(game)
         print(json.dumps(result, indent=2))
         return 0
-    except (OSError, ValueError, KeyError, configparser.Error) as exc:
+    except (OSError, ValueError, KeyError, RuntimeError, configparser.Error) as exc:
         parser.exit(2, f'{exc}\n')
 
 

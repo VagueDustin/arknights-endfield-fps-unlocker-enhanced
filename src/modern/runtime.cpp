@@ -1,9 +1,11 @@
 #include <windows.h>
 #include "MinHook.h"
+#include "graphics.h"
 #include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <mutex>
 
 namespace {
 std::wstring configPath;
@@ -20,6 +22,8 @@ void VsyncHook(int value, const void* method) {
 }
 
 void Log(const std::string& message) {
+    static std::mutex logMutex;
+    std::lock_guard<std::mutex> lock(logMutex);
     OutputDebugStringA(("Endfield Enhancer: " + message + "\n").c_str());
     std::ofstream file(logPath, std::ios::app);
     SYSTEMTIME time;
@@ -33,6 +37,15 @@ int Read(const wchar_t* name, int fallback) {
     return static_cast<int>(GetPrivateProfileIntW(L"FPS", name, fallback, configPath.c_str()));
 }
 bool ValidFps(int value) { return value == -1 || (value >= 30 && value <= 1000); }
+
+void PublishGraphics() {
+    auto value = [](const wchar_t* name) {
+        return static_cast<int>(GetPrivateProfileIntW(L"Graphics", name, -1, configPath.c_str()));
+    };
+    Graphics::Config config{value(L"Anisotropic"), value(L"Sharpening"), value(L"RenderScale"),
+        value(L"ShadowResolution"), value(L"AmbientOcclusion"), value(L"TemporalAA")};
+    if (Graphics::Valid(config)) Graphics::Publish(config);
+}
 
 struct Api {
     void* (*domainGet)();
@@ -88,7 +101,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
     std::error_code error;
     std::filesystem::create_directories(logDirectory, error);
     logPath = logDirectory / (L"runtime-" + std::to_wstring(GetCurrentProcessId()) + L".log");
-    Log("Starting FPS-only runtime 0.2.0. Graphics overrides are disabled.");
+    Log("Starting runtime 0.3.0. Graphics controls are opt-in.");
     if (!std::filesystem::is_regular_file(configPath, error)) {
         Log("Configuration missing; no overrides installed.");
         return 1;
@@ -160,6 +173,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
     }
     bool fpsCreated = false;
     bool vsyncCreated = false;
+    bool graphicsActive = false;
     status = MH_CreateHook(fpsAddress, reinterpret_cast<void*>(&FpsHook),
         reinterpret_cast<void**>(&originalFps));
     fpsCreated = status == MH_OK;
@@ -174,9 +188,14 @@ DWORD WINAPI Worker(LPVOID parameter) {
         Log(std::string("Hook setup failed: ") + MH_StatusToString(status));
     } else {
         Log("Unity setters hooked. Verify actual gameplay FPS separately.");
+        PublishGraphics();
+        graphicsActive = Graphics::Initialize(assembly,
+            Graphics::KnownRuntime((directory / L"GameAssembly.dll").wstring()), Log);
         int previousTarget = 0;
         int previousVsync = -2;
         while (true) {
+            PublishGraphics();
+            Graphics::CheckCallback();
             configured = Read(L"Target", 120);
             configuredVsync = Read(L"VSync", -1);
             background = Read(L"Background", 0);
@@ -205,7 +224,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
     // Only remove hooks owned by this component.
     if (fpsCreated) { MH_DisableHook(fpsAddress); MH_RemoveHook(fpsAddress); }
     if (vsyncCreated) { MH_DisableHook(vsyncAddress); MH_RemoveHook(vsyncAddress); }
-    MH_Uninitialize();
+    if (!graphicsActive) MH_Uninitialize();
     api.detach(thread);
     return 1;
 }
