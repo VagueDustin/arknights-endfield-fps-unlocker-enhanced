@@ -116,11 +116,11 @@ def locked(game):
 
 def settings(target=120, background=0, vsync=0, graphics=None):
     if target != -1 and not 30 <= target <= 1000:
-        raise ValueError('FPS must be 30–1000, or -1 for unlimited')
+        raise ValueError('FPS must be 30-1000, or -1 for unlimited')
     if background != 0 and not 30 <= background <= 1000:
-        raise ValueError('Background FPS must be 0 (disabled) or 30–1000')
+        raise ValueError('Background FPS must be 0 (disabled) or 30-1000')
     if not -1 <= vsync <= 4:
-        raise ValueError('VSync must be -1 (game setting) or 0–4')
+        raise ValueError('VSync must be -1 (game setting) or 0-4')
     values = dict(GRAPHICS_DEFAULTS)
     if graphics:
         if set(graphics) - set(values):
@@ -131,9 +131,9 @@ def settings(target=120, background=0, vsync=0, graphics=None):
     if values['Anisotropic'] not in (-1, 0, 1, 2):
         raise ValueError('Anisotropic filtering: -1 game, 0 off, 1 per-texture, 2 forced on')
     if not -1 <= values['Sharpening'] <= 100:
-        raise ValueError('Sharpening must be -1 (game) or 0–100 percent')
+        raise ValueError('Sharpening must be -1 (game) or 0-100 percent')
     if values['RenderScale'] != -1 and not 50 <= values['RenderScale'] <= 200:
-        raise ValueError('Render scale must be -1 (game) or 50–200 percent')
+        raise ValueError('Render scale must be -1 (game) or 50-200 percent')
     if values['ShadowResolution'] not in (-1, 512, 1024, 2048, 4096):
         raise ValueError('Shadow resolution must be -1, 512, 1024, 2048, or 4096')
     if any(values[key] not in (-1, 0, 1) for key in ('AmbientOcclusion', 'TemporalAA')):

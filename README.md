@@ -1,16 +1,83 @@
-# Arknights Endfield FPS Unlocker Enhanced
+# Fate Engine - Arknights Endfield FPS Unlocker
 
-A standalone Windows desktop application by **VagueDustin Enterprises** for live FPS control and experimental graphics tuning in Arknights: Endfield. Built from an FPS and graphics modernization of [EightySixK's unlocker](https://github.com/EightySixK/Arknights-Endfield-FPS-Unlocker).
-New code lives in `src/modern`. Historical upstream binaries in `bin` are not used.
+The 0.4.0 source introduces Fate Engine branding; the published 0.3.2 release still uses the name Endfield Enhancer. [Design review and installation options](docs/UI-REVIEW-0.4.0.md).
+
+### [View interactive DLSS 5 comparisons](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
+
+Drag the comparison slider or switch between Off / On, presets, and styles. No download required.
+
+A standalone Windows desktop application by **VagueDustin Enterprises** for live FPS control and experimental graphics tuning in Arknights: Endfield. Community pull requests are welcome; VagueDustin maintains the project and controls releases.
+The native implementation lives in `src/modern`. See [third-party notices](THIRD_PARTY_NOTICES.md) for project origins and dependency attribution.
 An initial gameplay test on September 11, 2026 was reported working by the user;
 runtime logs also confirm foreground/background target changes. Extended stability
 and other rendering modes remain unverified. This is still an experimental build.
 
-![Endfield Enhancer desktop app](docs/desktop.png)
+![Fate Engine desktop app](docs/desktop.png)
+
+## DLSS 5 screenshot comparisons
+
+Neural rendering is working in the local experimental setup. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). DLSS 5 is not bundled in the published app yet.
+
+**Off on the left, on on the right:**
+
+[![Outdoor scene with neural rendering off and on - open interactive gallery](docs/comparisons/cover-preview.jpg)](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
+
+**[Open the interactive gallery](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)** for a draggable divider and instant **Off / Compare / On** buttons. It includes all five scenes, three numbered presets, and the Natural and Cinematic styles. You can also download or clone the repository and open `docs/comparisons/index.html` locally. GitHub Pages hosts the interactive view; the README below provides expandable static comparisons.
+
+<details>
+<summary>Interior - Default neural rendering</summary>
+
+![Interior off and default NR on](docs/comparisons/interior-preview.jpg)
+
+[Full-size off](docs/comparisons/off.webp) / [Full-size default](docs/comparisons/default.webp)
+
+</details>
+
+<details>
+<summary>Team 1 - off / on</summary>
+
+![Team 1 off and on](docs/comparisons/t1-preview.jpg)
+
+[Full-size off](docs/comparisons/t1-off.webp) / [Full-size on](docs/comparisons/t1-on.webp)
+
+</details>
+
+<details>
+<summary>Team 2 - off / on</summary>
+
+![Team 2 off and on](docs/comparisons/t2-preview.jpg)
+
+[Full-size off](docs/comparisons/t2-off.webp) / [Full-size on](docs/comparisons/t2-on.webp)
+
+</details>
+
+<details>
+<summary>Team 3 - off / on</summary>
+
+![Team 3 off and on](docs/comparisons/t3-preview.jpg)
+
+[Full-size off](docs/comparisons/t3-off.webp) / [Full-size on](docs/comparisons/t3-on.webp)
+
+</details>
+
+<details>
+<summary>Explore NR presets and styles</summary>
+
+| Preset 1 | Preset 2 | Preset 3 |
+| --- | --- | --- |
+| ![NR Preset 1](docs/comparisons/preset-1.webp) | ![NR Preset 2](docs/comparisons/preset-2.webp) | ![NR Preset 3](docs/comparisons/preset-3.webp) |
+
+| Default | Natural | Cinematic |
+| --- | --- | --- |
+| ![Default NR](docs/comparisons/default.webp) | ![Natural NR style](docs/comparisons/natural.webp) | ![Cinematic NR style](docs/comparisons/cinematic.webp) |
+
+</details>
+
+These are separate user-supplied captures, not synchronized frames or a controlled benchmark. Poses, camera, UI, and lighting can differ, especially between interior styles and presets. Full-size images preserve the original pixels as lossless WebP; side-by-side README previews are resized. The observed 110 FPS off / 50 FPS on result was from one earlier scene and should not be read as a benchmark for every screenshot.
 
 ## Features
 
-- 120, 144, 240, and unlimited presets; custom targets from 30–1000 FPS.
+- 120, 144, 240, and unlimited presets; custom targets from 30-1000 FPS.
 - Optional background FPS cap; 0 disables the background override.
 - Independent VSync control and restoration of the value captured at startup.
 - Live settings reload, bounded initialization, and per-process diagnostic logs.
@@ -26,9 +93,9 @@ while graphics are disabled. The old graphics code is excluded from the build.
 | Control | Values | Behavior |
 | --- | --- | --- |
 | Anisotropic filtering | Game, off, per-texture, forced on | Unity filtering mode; does not impose a numeric AF level |
-| Sharpening | Game, 0–100% | Updates available game, DLSS, FSR3, and PSSR sharpening parameters |
-| Render scale | Game, 50–200% | Requests the game's rendering-scale parameter |
-| Shadow maps | Game, 512–4096 px | Updates supported CSM, character, punctual, and ASM maps |
+| Sharpening | Game, 0-100% | Updates available game, DLSS, FSR3, and PSSR sharpening parameters |
+| Render scale | Game, 50-200% | Requests the game's rendering-scale parameter |
+| Shadow maps | Game, 512-4096 px | Updates supported CSM, character, punctual, and ASM maps |
 | Ambient occlusion | Game, off, on | Toggles GTAO |
 | Temporal AA | Game, off, on | Toggles TAAU; does not disable DLSS or FSR |
 
@@ -51,7 +118,7 @@ Download the artifact from a successful **Windows build and tests** run on the
 `main` branch. Extract the entire package into its own folder. Keep the
 manager next to `package.json` and the two compiled DLLs.
 
-Run **EndfieldEnhancer.exe**, choose the folder containing `Endfield.exe`, inspect
+Run **FateEngine.exe** (**EndfieldEnhancer.exe** in 0.3.2), choose the folder containing `Endfield.exe`, inspect
 it, and install with the game closed. The desktop defaults to 144 FPS, VSync off, and a 30 FPS background cap;
 existing settings are loaded when available. CLI defaults are 120 FPS and no background cap. If Windows denies write access, run the manager as administrator.
 
@@ -129,7 +196,7 @@ teleporting between regions, and an extended play session. Test rendering modes
 separately, then restore and verify a clean launch. Verify each graphics control
 visually and inspect its runtime readback before treating it as game-validated.
 
-MIT license. Original copyright and attribution are preserved in LICENSE.
+MIT license. Project licensing is in LICENSE; applicable upstream notices are preserved in THIRD_PARTY_NOTICES.md and licenses/.
 
 ## Windows app and installer
 
@@ -141,7 +208,11 @@ The app records managed installation locations. Uninstalling the app restores th
 
 This repository is independent on GitHub and retains the original project's MIT license and history. No game binaries or private brand repository contents beyond the selected public-facing theme tokens are distributed.
 
-Provided by VagueDustin Enterprises™ · © 2026 Endfield Enhancer. All rights reserved. Source code licensing is governed by LICENSE.
+The 0.4.0 installer offers a current-user company folder without admin, or an all-users installation under `C:\Program Files\VagueDustin Enterprises\Fate Engine` with elevation. The Start menu name includes **Arknights Endfield FPS Unlocker** for search. Game-file permissions remain separate from app installation permissions.
+
+DLSS 5 has been validated in the local experimental setup and is not yet included in the app. See the [feasibility notes](docs/DLSS5-FEASIBILITY.md).
+
+Provided by VagueDustin Enterprises™ · © 2026 Fate Engine. All rights reserved. Source code licensing is governed by LICENSE.
 
 ## Live validation
 

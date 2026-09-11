@@ -9,4 +9,4 @@ files = {}
 for name in ('d3dcompiler_47.dll', 'endfield_fps.dll'):
     with (package / name).open('rb') as stream:
         files[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
-(package / 'package.json').write_text(json.dumps({'version': '0.3.2', 'files': files}, indent=2))
+(package / 'package.json').write_text(json.dumps({'version': json.loads((Path(__file__).resolve().parents[1] / 'assets/identity/product.json').read_text(encoding='utf-8-sig'))['version'], 'files': files}, indent=2))

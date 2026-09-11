@@ -1,0 +1,51 @@
+{
+  "captures": {
+    "cover-off": "Cover Off",
+    "cover-on": "Cover DLSS 5 On",
+    "off": "Off",
+    "default": "DLSS 5 Default",
+    "preset-1": "DLSS 5 NR Preset 1",
+    "preset-2": "DLSS 5 NR Preset 2",
+    "preset-3": "DLSS 5 NR Preset 3",
+    "cinematic": "DLSS 5 NR Style Cinematic",
+    "natural": "DLSS 5 NR Style Natural",
+    "t1-off": "T1 Off",
+    "t1-on": "T1 DLSS 5 On",
+    "t2-off": "T2 Off",
+    "t2-on": "T2 DLSS 5 On",
+    "t3-off": "T3 Off",
+    "t3-on": "T3 DLSS 5 On"
+  },
+  "pairs": [
+    [
+      "cover",
+      "Outdoor scene",
+      "cover-off",
+      "cover-on"
+    ],
+    [
+      "interior",
+      "Interior / Default",
+      "off",
+      "default"
+    ],
+    [
+      "t1",
+      "Team 1",
+      "t1-off",
+      "t1-on"
+    ],
+    [
+      "t2",
+      "Team 2",
+      "t2-off",
+      "t2-on"
+    ],
+    [
+      "t3",
+      "Team 3",
+      "t3-off",
+      "t3-on"
+    ]
+  ]
+}

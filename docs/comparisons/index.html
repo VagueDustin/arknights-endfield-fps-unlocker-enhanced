@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fate Engine - Arknights Endfield DLSS 5 comparisons</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b101b'/%3E%3Cpath d='M9 7h16v5H14v4h9v5h-9v6H9z' fill='%23e4c27c'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="gallery.css">
+</head>
+<body>
+<header><span class="brand">FATE ENGINE</span><a href="https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced">Repository</a></header>
+<main>
+<p class="eyebrow">ARKNIGHTS ENDFIELD / DLSS 5 NEURAL RENDERING</p>
+<h1>See the difference.</h1>
+<p class="intro">Explore the supplied gameplay captures. Drag the divider, switch between off and on, or compare NR styles and presets.</p>
+<div class="controls">
+<label>Scene<select id="scene"><option value="cover">Outdoor scene</option><option value="interior">Interior / styles &amp; presets</option><option value="t1">Team 1</option><option value="t2">Team 2</option><option value="t3">Team 3</option></select></label>
+<label id="variant-label" hidden>NR appearance<select id="variant"><option value="default">Default</option><option value="preset-1">Preset 1</option><option value="preset-2">Preset 2</option><option value="preset-3">Preset 3</option><option value="cinematic">Cinematic</option><option value="natural">Natural</option></select></label>
+<div class="modes" aria-label="Comparison view"><button data-position="0">Off</button><button data-position="50" class="active">Compare</button><button data-position="100">On</button></div>
+</div>
+<div class="viewer" id="viewer">
+<img id="before" src="cover-off.webp" alt="Outdoor scene with neural rendering off" width="2560" height="1440">
+<img id="after" src="cover-on.webp" alt="Outdoor scene with neural rendering on" width="2560" height="1440">
+<span class="tag left">NR ON</span><span class="tag right">NR OFF</span><span id="divider" aria-hidden="true"></span>
+<input id="slider" type="range" min="0" max="100" value="50" aria-label="Amount of neural rendering image shown">
+</div>
+<div class="caption"><span id="status" role="status">Outdoor scene - 50% NR on</span><span><a id="off-link" href="cover-off.webp" target="_blank" rel="noopener">Full-size off</a> / <a id="on-link" href="cover-on.webp" target="_blank" rel="noopener">Full-size on</a></span></div>
+<p class="note">Separate captures, not synchronized frames. Character poses, camera position, UI, and scene lighting can differ. Interior styles and presets in particular are not pixel-aligned. Images retain their original 2560 x 1440 pixels in lossless WebP format.</p>
+<footer><span><kbd>Insert</kbd> toggles neural rendering in the tested setup.</span><span>Experimental integration. Not bundled in the published app.</span></footer>
+</main>
+<script src="gallery.js"></script>
+</body></html>

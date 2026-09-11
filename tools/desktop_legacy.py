@@ -32,7 +32,7 @@ def find_game():
 class Panel:
     def __init__(self, window):
         self.window = window
-        window.title('Endfield Enhancer — experimental')
+        window.title('Endfield Enhancer - experimental')
         window.geometry('860x810')
         window.minsize(820, 740)
         window.protocol('WM_DELETE_WINDOW', self.close)
@@ -69,7 +69,7 @@ class Panel:
             values=['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes', 'Every 3 refreshes', 'Every 4 refreshes']).grid(row=3, column=1, sticky='w')
         ttk.Label(controls, text='VSync can take priority over your FPS cap.\nApply settings while playing; install or restore with the game closed.',
                   wraplength=340).grid(row=0, column=2, rowspan=4, padx=22, sticky='nw')
-        graphics = ttk.LabelFrame(body, text='Graphics — experimental', padding=12)
+        graphics = ttk.LabelFrame(body, text='Graphics - experimental', padding=12)
         graphics.pack(fill='x', pady=12)
         self.graphics_preset = tk.StringVar(value='game')
         ttk.Label(graphics, text='Profile').grid(row=0, column=0, sticky='w')

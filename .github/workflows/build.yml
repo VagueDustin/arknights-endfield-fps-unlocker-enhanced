@@ -28,25 +28,34 @@ jobs:
       - name: Build standalone manager
         run: |
           python -m pip install pyinstaller==6.16.0 customtkinter==5.2.2 pillow==11.3.0
-          python -m PyInstaller --noconfirm --clean --onefile --name EndfieldManager --distpath build/package tools/manage.py
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all customtkinter --add-data "assets;assets" --name EndfieldEnhancer --distpath build/package tools/desktop.py
+          python tools/build_product_assets.py
+          python -m PyInstaller --noconfirm --clean --onefile --icon assets/identity/fate-engine.ico --version-file build/brand/EndfieldManager-version.txt --name EndfieldManager --distpath build/package tools/manage.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all customtkinter --add-data "assets;assets" --icon assets/identity/fate-engine.ico --version-file build/brand/FateEngine-version.txt --name FateEngine --distpath build/package tools/desktop.py
           build/package/EndfieldManager.exe profiles
           python tools/package_notices.py build/package
-          $app = Start-Process build/package/EndfieldEnhancer.exe -ArgumentList "--smoke-test" -WindowStyle Hidden -PassThru -Wait
+          $app = Start-Process build/package/FateEngine.exe -ArgumentList "--smoke-test" -WindowStyle Hidden -PassThru -Wait
           if ($app.ExitCode -ne 0) { throw "Desktop smoke test failed" }
       - name: Build Windows installer
-        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/EndfieldEnhancer.iss'
+        run: |
+          $compilerSetup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $compilerSetup
+          if ((Get-FileHash $compilerSetup -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Compiler checksum mismatch' }
+          $compilerDir = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          $compilerInstall = Start-Process $compilerSetup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/NOICONS', ('/DIR="' + $compilerDir + '"') -WindowStyle Hidden -Wait -PassThru
+          if ($compilerInstall.ExitCode -ne 0) { throw 'Compiler installation failed' }
+          & (Join-Path $compilerDir 'ISCC.exe') installer/EndfieldEnhancer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
       - name: Verify setup and uninstall
         run: |
           $setup = Get-ChildItem build/installer/*.exe | Select-Object -First 1
           $target = Join-Path $env:RUNNER_TEMP 'EndfieldSetupTest'
-          $install = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', ('/DIR="' + $target + '"') -WindowStyle Hidden -Wait -PassThru
+          $install = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', ('/DIR="' + $target + '"') -WindowStyle Hidden -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Setup failed' }
-          $app = Start-Process (Join-Path $target 'EndfieldEnhancer.exe') -ArgumentList '--smoke-test' -WindowStyle Hidden -Wait -PassThru
+          $app = Start-Process (Join-Path $target 'FateEngine.exe') -ArgumentList '--smoke-test' -WindowStyle Hidden -Wait -PassThru
           if ($app.ExitCode -ne 0) { throw 'Installed app startup failed' }
           $remove = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw 'Uninstall failed' }
-          if (Test-Path (Join-Path $target 'EndfieldEnhancer.exe')) { throw 'App remains after uninstall' }
+          if (Test-Path (Join-Path $target 'FateEngine.exe')) { throw 'App remains after uninstall' }
       - uses: actions/upload-artifact@v4
         with:
           name: EndfieldEnhancer-windows-x64-experimental

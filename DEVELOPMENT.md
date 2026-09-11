@@ -1,4 +1,4 @@
-# Fork development status
+# Fate Engine development status
 
 Current milestone: compiled experimental FPS runtime and standalone desktop/CLI
 manager. The Windows CI build and native integration test passed at revision
@@ -7,7 +7,7 @@ backup. On September 11, 2026, the user reported that the installed build
 "appears to be working perfectly." Runtime logs show repeated 30-to-144 FPS
 target transitions as focus changes. This is a successful initial gameplay test;
 extended stability, quantitative frame pacing, and other renderers remain unverified.
-Upstream binaries remain historical artifacts.
+Unused upstream binaries and sources are retained only in Git history.
 
 Run with Python 3.11 or newer:
 

@@ -1,0 +1,8 @@
+{
+  "name": "Fate Engine",
+  "subtitle": "Arknights Endfield FPS Unlocker",
+  "publisher": "VagueDustin Enterprises",
+  "app_user_model_id": "VagueDustin.FateEngine",
+  "executable": "FateEngine.exe",
+  "version": "0.4.0"
+}
