@@ -2,3 +2,10 @@ __pycache__/
 build/
 local-reports/
 *.spec
+# GPL-3.0 native NR prototype and its tooling live on the experiments/native-nr branch, not on main.
+native/
+tools/build_native_nr.py
+tools/package_native_nr.py
+tools/native_diagnostic.py
+tools/test_native_transport.py
+tools/test_startup_trace.py

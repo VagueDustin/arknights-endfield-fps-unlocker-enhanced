@@ -16,7 +16,7 @@ and other rendering modes remain unverified. Graphics tuning remains experimenta
 
 ## DLSS 5 screenshot comparisons
 
-Neural rendering is working in the local experimental setup. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). The 0.4.4 bundled installer includes the tested components. Choose the DLSS 5 page for its three-step ReShade setup. Presets are controlled in the ReShade overlay with Home.
+Neural rendering is working in the local experimental setup. **Requires a GeForce RTX 50-series GPU**: the tested NVIDIA neural runtime does not run on RTX 40 or older cards, and Fate Engine refuses the DLSS 5 setup when the game's Player.log shows another GPU. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). The 0.4.4 bundled installer includes the tested components. Choose the DLSS 5 page for its three-step ReShade setup. Presets are controlled in the ReShade overlay with Home.
 
 **Off on the left, on on the right:**
 
@@ -87,7 +87,7 @@ These are separate user-supplied captures, not synchronized frames or a controll
 - Opt-in graphics profiles, typed runtime checks, value readback, and reset.
 - Upgrade with preservation of the previous build and its configuration.
 
-Version 0.3.2 includes a navy-and-gold live control app, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
+The desktop app provides a navy-and-gold live control panel, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
 are gated to the inspected runtime SHA-256. Unknown builds retain FPS support
 while graphics are disabled. The old graphics code is excluded from the build.
 
@@ -117,9 +117,11 @@ are logged per parameter; an incompatible feature cannot enable raw-offset write
 
 Download the artifact from a successful **Windows build and tests** run on the
 `main` branch. Extract the entire package into its own folder. Keep the
-manager next to `package.json` and the two compiled DLLs.
+manager next to `package.json` and the two compiled DLLs. The CI installer artifact is
+the unbundled build, named `...-unbundled.exe`: it has no ReShade setup or DLSS 5
+components and asks for your own copies. The bundled download is only on the Releases page.
 
-Run **FateEngine.exe** (**EndfieldEnhancer.exe** in 0.3.2), choose the folder containing `Endfield.exe`, inspect
+Run **FateEngine.exe**, choose the folder containing `Endfield.exe`, inspect
 it, and install with the game closed. The desktop defaults to 144 FPS, VSync off, and a 30 FPS background cap;
 existing settings are loaded when available. CLI defaults are 120 FPS and no background cap. If Windows denies write access, run the manager as administrator.
 
@@ -139,6 +141,7 @@ For command-line use, run EndfieldManager.exe (or `python manage.py`):
 .\EndfieldManager.exe configure --game 'C:\path\to\EndField Game' --graphics-preset game
 .\EndfieldManager.exe rollback --game 'C:\path\to\EndField Game'
 .\EndfieldManager.exe diagnostics --game 'C:\path\to\EndField Game'
+.\EndfieldManager.exe export-diagnostics --game 'C:\path\to\EndField Game'
 .\EndfieldManager.exe restore --game 'C:\path\to\EndField Game'
 ```
 
@@ -168,6 +171,20 @@ unchanged and releases graphics overrides at the next render callback.
 Restore before a game update or another compiler-proxy installation. The manager
 does not disable anti-cheat or conceal files. Gameplay and account safety cannot
 be established by these tests; this remains an experimental game modification.
+
+## Troubleshooting
+
+**Set up FPS unlocker seems to do nothing.** Outcomes appear in the status bar and as a dialog; the full result stays on the **Recovery** page. If the message mentions denied access, accept the prompt to restart Fate Engine as administrator. Game folders that Epic or the game launcher did not create are often read-only for normal users.
+
+**The game runs but the header stays on "Waiting for runtime" or shows "Runtime not detected".** The loader never started inside Endfield. The runtime starts when the game loads `d3dcompiler_47.dll` from its folder, which Endfield does through its embedded browser components rather than at engine start, so a working session reports the runtime some seconds after launch. A session that never loads that library, or in which anti-cheat or antivirus software blocks the load, never starts the runtime. Open **Recovery > Inspect installation**; `changed_or_missing_files` must be empty. Antivirus software sometimes quarantines `endfield_fps.dll` or the proxy `d3dcompiler_47.dll`. Restore them from quarantine, exclude the game folder, then run **Set up FPS unlocker** again. If the files are intact, choose **Export diagnostics** and attach the report to an issue; it records how long the game ran, whether the runtime ever reported, and the anti-cheat service state during the session.
+
+**Check setup says the GPU cannot run DLSS 5.** The bundled NVIDIA neural runtime targets GeForce RTX 50-series GPUs. On RTX 40 and older cards ReShade would load but neural rendering cannot start, so Fate Engine stops before installing anything. The FPS unlocker does not depend on the GPU.
+
+**ReShade does not open with Home.** On the **DLSS 5** page choose **Check setup**. It explains why the ReShade Vulkan layer is not registered (wrong application path, missing files, or a declined administrator prompt), which renderer the last Endfield launch used, and whether ReShade initialized and loaded the add-ons. The tested setup needs Endfield on **Vulkan**; on Direct3D the layer and the DLSS 5 bridge never load.
+
+**ReShade opens but neural rendering has no effect.** NR starts off; press **Insert**. The NVIDIA NR runtime needs an RTX 50-series GPU and a DLSS 5-capable driver. Check setup reports how often NR was switched on in the last logged session.
+
+Attach the file written by **Export diagnostics** (or `EndfieldManager.exe export-diagnostics --game '...'`) to any report. It contains folder paths and log excerpts only.
 
 ## Build and test
 
@@ -211,7 +228,7 @@ This repository is independent on GitHub and retains the original project's MIT 
 
 The 0.4.0 installer offers a current-user company folder without admin, or an all-users installation under `C:\Program Files\VagueDustin Enterprises\Fate Engine` with elevation. The Start menu name includes **Arknights Endfield FPS Unlocker** for search. Game-file permissions remain separate from app installation permissions.
 
-DLSS 5 has been validated in the local experimental setup and is not yet included in the app. See the [feasibility notes](docs/DLSS5-FEASIBILITY.md).
+The tested DLSS 5 components ship in the bundled installer since 0.4.4. See [DLSS 5 with ReShade](docs/DLSS-RESHade-SETUP.md) for setup and the [feasibility notes](docs/DLSS5-FEASIBILITY.md) for how the stack was validated. Releases are assembled per [docs/RELEASE.md](docs/RELEASE.md).
 
 Provided by VagueDustin Enterprises™ · © 2026 Fate Engine. All rights reserved. Source code licensing is governed by LICENSE.
 
