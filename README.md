@@ -2,8 +2,9 @@
 
 An FPS-only modernization of [EightySixK's unlocker](https://github.com/EightySixK/Arknights-Endfield-FPS-Unlocker).
 New code lives in `src/modern`. Historical upstream binaries in `bin` are not used.
-**Gameplay compatibility is not yet verified.** Build and simulated runtime tests
-do not establish stability in Endfield.
+An initial gameplay test on September 11, 2026 was reported working by the user;
+runtime logs also confirm foreground/background target changes. Extended stability
+and other rendering modes remain unverified. This is still an experimental build.
 
 ## Features
 
@@ -82,7 +83,7 @@ runtime: live FPS/VSync changes, VSync restore, background cap, and attachment o
 the worker thread. It does not test the real engine or its graphics API loading.
 CI also builds standalone managers with PyInstaller.
 
-## Gameplay validation still required
+## Further gameplay validation
 
 Check startup logs, measured FPS, focus loss/return, live settings, menus,
 teleporting between regions, and an extended play session. Test rendering modes
