@@ -88,6 +88,13 @@ class ManagerTests(unittest.TestCase):
         self.assertFalse((self.game / manage.ORIGINAL).exists())
         self.assertFalse((self.game / manage.STATE).exists())
 
+    def test_backup_failure_leaves_game_and_state_clean(self):
+        with patch.object(manage, 'atomic_write', side_effect=OSError('no space')):
+            with self.assertRaisesRegex(OSError, 'no space'):
+                self.install()
+        self.assertEqual((self.game / manage.COMPILER).read_bytes(), self.original)
+        self.assertFalse((self.game / manage.STATE).exists())
+
     def test_package_tamper_prevents_install(self):
         (self.package / manage.PAYLOAD).write_bytes(b'corrupt')
         with self.assertRaisesRegex(ValueError, 'checksum'):

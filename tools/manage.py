@@ -175,7 +175,10 @@ def install(game, package, config):
         atomic_write(state / 'original.bin', original)
         atomic_write(state / 'manifest.json', json.dumps(manifest, indent=2).encode())
     except Exception:
-        # No game file has changed yet. Preserve anything written for inspection.
+        # No game files changed; remove only files created in this new state directory.
+        for name in ('manifest.json', 'original.bin'):
+            (state / name).unlink(missing_ok=True)
+        state.rmdir()
         raise
     try:
         # Install the loader last, after all its dependencies exist.

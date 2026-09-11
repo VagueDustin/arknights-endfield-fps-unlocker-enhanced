@@ -1,5 +1,6 @@
 """Small desktop control panel for the reversible FPS package."""
 import json
+import configparser
 import os
 from pathlib import Path
 import queue
@@ -33,6 +34,7 @@ class Panel:
         window.title('Endfield Enhancer — experimental')
         window.geometry('780x630')
         window.minsize(700, 580)
+        window.protocol('WM_DELETE_WINDOW', self.close)
         self.events = queue.Queue()
         self.busy = False
         body = ttk.Frame(window, padding=20)
@@ -53,9 +55,10 @@ class Panel:
         self.vsync = tk.StringVar(value='Off')
         ttk.Label(controls, text='Preset').grid(row=0, column=0, sticky='w', padx=(0, 12))
         preset = ttk.Combobox(controls, textvariable=self.preset,
-                              values=list(manage.PRESETS), state='readonly', width=18)
+                              values=[*manage.PRESETS, 'custom'], state='readonly', width=18)
         preset.grid(row=0, column=1, sticky='w')
-        preset.bind('<<ComboboxSelected>>', lambda _: self.fps.set(str(manage.PRESETS[self.preset.get()])))
+        preset.bind('<<ComboboxSelected>>', self.choose_preset)
+        self.fps.trace_add('write', self.update_preset)
         for index, (label, variable) in enumerate((('FPS (−1 = unlimited)', self.fps),
                                                   ('Background FPS (0 = off)', self.background)), 1):
             ttk.Label(controls, text=label).grid(row=index, column=0, sticky='w', pady=7)
@@ -80,12 +83,46 @@ class Panel:
         ttk.Label(body, textvariable=self.status, wraplength=720).pack(anchor='w', pady=10)
         self.output = tk.Text(body, height=10, wrap='word', font=('Consolas', 10), state='disabled')
         self.output.pack(fill='both', expand=True)
+        self.load_profile()
         window.after(100, self.poll)
+
+    def choose_preset(self, _):
+        if self.preset.get() in manage.PRESETS:
+            self.fps.set(str(manage.PRESETS[self.preset.get()]))
+
+    def update_preset(self, *_):
+        self.preset.set(next((name for name, value in manage.PRESETS.items()
+                             if str(value) == self.fps.get()), 'custom'))
+
+    def close(self):
+        if self.busy:
+            messagebox.showinfo('Action in progress', 'Wait for the current action to finish before closing.')
+        else:
+            self.window.destroy()
+
+    def load_profile(self):
+        path = Path(self.game.get()) / manage.CONFIG
+        if not path.is_file() or path.is_symlink():
+            return
+        try:
+            config = configparser.ConfigParser()
+            config.read(path)
+            fps = config['FPS'].getint('Target')
+            background = config['FPS'].getint('Background')
+            vsync = config['FPS'].getint('VSync')
+            manage.settings(fps, background, vsync)
+            self.fps.set(str(fps))
+            self.background.set(str(background))
+            self.vsync.set(['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes',
+                           'Every 3 refreshes', 'Every 4 refreshes'][vsync + 1])
+        except (OSError, ValueError, KeyError, configparser.Error):
+            self.status.set('Could not read existing settings; inspect the installation before applying changes.')
 
     def browse(self):
         selected = filedialog.askdirectory(title='Select Endfield game folder')
         if selected:
             self.game.set(selected)
+            self.load_profile()
 
     def run(self, action):
         if self.busy:
