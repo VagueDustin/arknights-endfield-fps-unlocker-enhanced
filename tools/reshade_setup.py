@@ -19,6 +19,19 @@ def component_folder():
 def launch(game):
     game = neural.game_path(game)
     manage.game_idle()
+    api = neural.graphics_api()
+    if api.startswith('Direct3D'):
+        raise ValueError(f'The last Endfield launch used {api}. This setup installs ReShade as a Vulkan layer, '
+                         'which never loads on Direct3D, so the wizard was not started.')
+    gpu = neural.gpu_name()
+    if neural.dlss5_capable(gpu) is False:
+        raise ValueError(f'The last Endfield launch rendered on "{gpu}". The tested DLSS 5 neural runtime only runs '
+                         'on GeForce RTX 50-series GPUs, so this setup cannot work on this PC. The wizard was not started; '
+                         'ReShade alone can still be installed from https://reshade.me/ if you want it.')
+    if neural.reshade_status(game):
+        # Re-running the wizard on a registered game offers Update/Modify/Uninstall; one wrong click removes the layer.
+        return ('ReShade is already registered for this game. Continue with Install DLSS components. '
+                'Run the ReShade wizard again only to update or uninstall it.')
     setup = package_root() / 'prerequisites' / SETUP_NAME
     if not setup.exists():
         webbrowser.open('https://reshade.me/#download')

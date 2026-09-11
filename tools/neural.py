@@ -74,22 +74,122 @@ def merge_settings(data, updates, missing_only=False):
     return (b'\xef\xbb\xbf' if data.startswith(b'\xef\xbb\xbf') else b'') + result
 
 
-def reshade_status(game):
+def reshade_details(game):
+    """Explain why ReShade's Vulkan layer would not load for Endfield; empty when ready."""
     root = Path(os.environ.get('PROGRAMDATA', 'C:/ProgramData')) / 'ReShade'
     manifest = root / 'ReShade64.json'
     try:
         apps = (root / 'ReShadeApps.ini').read_text(encoding='utf-8-sig')
-        entries = next((line[5:].split(',') for line in apps.splitlines() if line.startswith('Apps=')), [])
-        enabled = str(game / 'Endfield.exe').casefold() in {p.strip().casefold() for p in entries}
-        if not enabled or not manifest.is_file() or not (root / 'ReShade64.dll').is_file():
-            return False
+    except OSError:
+        return ['ReShade is not set up on this PC yet (no ReShadeApps.ini under ProgramData). '
+                'Run the ReShade setup for Endfield.exe with the Vulkan API.']
+    problems = []
+    entries = next((line[5:].split(',') for line in apps.splitlines() if line.startswith('Apps=')), [])
+    if str(game / 'Endfield.exe').casefold() not in {p.strip().casefold() for p in entries}:
+        problems.append('Endfield.exe from this game folder is not in ReShade\'s enabled application list. '
+                        'Run the ReShade setup again and pick this exact Endfield.exe.')
+    if not manifest.is_file() or not (root / 'ReShade64.dll').is_file():
+        problems.append('ReShade64.dll or its Vulkan layer manifest is missing from ProgramData\\ReShade. '
+                        'Reinstall ReShade with full addon support.')
+    try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Khronos\Vulkan\ImplicitLayers',
                             0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
             value, kind = winreg.QueryValueEx(key, str(manifest))
-        return value == 0 and kind == winreg.REG_DWORD
+        if value != 0 or kind != winreg.REG_DWORD:
+            problems.append('The ReShade Vulkan layer is registered but disabled in the registry.')
     except (OSError, ImportError):
+        problems.append('The ReShade Vulkan layer is not registered for all users. Run the ReShade setup '
+                        'again and allow its administrator prompt; without it the layer never loads.')
+    return problems
+
+
+def reshade_status(game):
+    return not reshade_details(game)
+
+
+def player_log_path():
+    """Unity writes Endfield's Player.log under the user's LocalLow folder."""
+    local = os.environ.get('LOCALAPPDATA')
+    return Path(local).parent / 'LocalLow' / 'Gryphline' / 'Endfield' / 'Player.log' if local else None
+
+
+def graphics_api(path=None):
+    """Name the renderer Endfield used in its most recent launch, from Unity's Player.log."""
+    path = player_log_path() if path is None else Path(path)
+    try:
+        if path is None or not path.is_file():
+            return 'Unknown (Endfield has not written a Player.log yet)'
+        with path.open('rb') as stream:
+            head = stream.read(262144).decode('utf-8', errors='replace')
+    except OSError:
+        return 'Unknown (Player.log unreadable)'
+    direct3d = re.search(r'Direct3D\s*(1[12])', head)
+    if direct3d:
+        return f'Direct3D {direct3d[1]}'
+    if re.search(r'\[Vulkan init\]|^Vulkan:|vulkan instance layer', head, re.MULTILINE):
+        return 'Vulkan'
+    return 'Unknown (renderer not recorded in Player.log)'
+
+
+def gpu_name(path=None):
+    """Name the GPU Endfield rendered on in its most recent launch, or None when unrecorded."""
+    path = player_log_path() if path is None else Path(path)
+    try:
+        if path is None or not path.is_file():
+            return None
+        with path.open('rb') as stream:
+            head = stream.read(262144).decode('utf-8', errors='replace')
+    except OSError:
+        return None
+    devices = re.findall(r'\[Vulkan init\] Physical Device \S+ \[\d+\]: "([^"]+)" deviceType=(\d)', head)
+    for name, kind in devices:
+        if kind == '2':  # VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+            return name.strip()
+    if devices:
+        return devices[0][0].strip()
+    match = re.search(r'^\s*Renderer:\s*(.+?)\s*(?:\(ID=.*)?$', head, re.MULTILINE)
+    return match[1].strip() if match else None
+
+
+def dlss5_capable(name):
+    """True or False when the GPU family is recognizable; None when it cannot be judged.
+
+    The tested NVIDIA neural runtime (nvngx_dlssnr.dll 310.8.0.0) targets GeForce RTX 50-series GPUs.
+    """
+    if not name:
+        return None
+    match = re.search(r'RTX\s*(\d)(\d{2,3})', name)
+    if match:
+        return int(match[1]) >= 5
+    if re.search(r'GTX|Radeon|Intel|Arc\b', name, re.IGNORECASE):
         return False
+    return None
+
+
+def launch_evidence(game):
+    """Read what the last launch logged locally; never loads or probes the game."""
+    gpu = gpu_name()
+    evidence = {'graphics_api': graphics_api(), 'gpu': gpu, 'dlss5_capable': dlss5_capable(gpu),
+                'reshade_log': 'ReShade has not written a log for this game yet.',
+                'addons_loaded': [], 'nr_toggles': 0}
+    log = game / 'ReShade.log'
+    if log.is_file():
+        try:
+            with log.open('rb') as stream:
+                head = stream.read(262144).decode('utf-8', errors='replace')
+                stream.seek(max(0, log.stat().st_size - 65536))
+                tail = stream.read().decode('utf-8', errors='replace')
+        except OSError:
+            head = tail = ''
+        if "Initializing crosire's ReShade" in head:
+            evidence['reshade_log'] = 'ReShade initialized inside Endfield during the last logged launch.'
+        else:
+            evidence['reshade_log'] = 'ReShade.log exists but records no initialization.'
+        # ReShade re-registers add-ons whenever the game recreates its Vulkan instance; report each once.
+        evidence['addons_loaded'] = list(dict.fromkeys(re.findall(r'Registered add-on "([^"]+)"', head)))
+        evidence['nr_toggles'] = tail.count('NR toggled ON')
+    return evidence
 
 
 def inspect(game):
@@ -97,11 +197,13 @@ def inspect(game):
     components = {name: ('Missing' if not (game / name).exists() else
                         'Tested version' if manage.digest(game / name) == expected else 'Unrecognized version')
                   for name, expected in FILES.items()}
-    result = {'components': components, 'reshade_registered': reshade_status(game),
+    problems = reshade_details(game)
+    result = {'components': components, 'reshade_registered': not problems, 'reshade_problems': problems,
               'ownership': 'Fate Engine' if (game / STATE).exists() else 'External / unmanaged',
               'conflicting_addon': (game / 'renodx-dlss.addon64').exists(),
               'saved_enabled': None, 'toggle_key': None,
               'runtime': 'Not measured. Saved settings do not prove active neural rendering.'}
+    result.update(launch_evidence(game))
     if (game / CONFIG).exists():
         parser = configparser.ConfigParser(interpolation=None)
         parser.read_string((game / CONFIG).read_text(encoding='utf-8-sig'))
@@ -148,7 +250,18 @@ def install(game, source):
         if (game / STATE).exists():
             raise ValueError('Neural installation is already managed. Remove it before reinstalling.')
         if not reshade_status(game):
-            raise ValueError('Install ReShade with full addon support for Endfield Vulkan first. See DLSS setup instructions.')
+            raise ValueError('Install ReShade with full addon support for Endfield Vulkan first. '
+                             + ' '.join(reshade_details(game)))
+        api = graphics_api()
+        if api.startswith('Direct3D'):
+            raise ValueError(f'The last Endfield launch used {api}. The ReShade Vulkan layer and the DLSS 5 bridge '
+                             'only load when Endfield runs on Vulkan, so these components would never activate. '
+                             'No files were changed.')
+        gpu = gpu_name()
+        if dlss5_capable(gpu) is False:
+            raise ValueError(f'The last Endfield launch rendered on "{gpu}". The tested NVIDIA neural runtime '
+                             '(nvngx_dlssnr.dll 310.8.0.0) only runs on GeForce RTX 50-series GPUs, so DLSS 5 '
+                             'cannot work on this PC. No files were changed.')
         for name in (*FILES, BRIDGE, 'renodx-dlss.addon64'):
             if (game / name).exists():
                 raise ValueError(f'Existing file preserved: {name}. This setup is not automatically adopted.')
@@ -250,7 +363,11 @@ def summary(result):
     if 'components' in state:
         labels = {'renodx-dlss5.addon64': 'Neural addon', 'dlss5-bridge.addon64': 'Vulkan bridge', 'nvngx_dlssnr.dll': 'NVIDIA NR runtime'}
         lines.extend(f'{labels[name]}: {value}' for name, value in state['components'].items())
-        lines.append('ReShade: ' + ('Registered for this game' if state['reshade_registered'] else 'Setup needed'))
+        if state['reshade_registered']:
+            lines.append('ReShade: Registered for this game')
+        else:
+            lines.append('ReShade: Setup needed')
+            lines.extend('  - ' + problem for problem in state.get('reshade_problems', []))
         lines.append('File management: ' + state['ownership'])
         if state['conflicting_addon']:
             lines.append('Conflict: newer neural addon is also present. Do not load both.')
@@ -259,6 +376,25 @@ def summary(result):
         lines.append('Toggle: ' + ('Insert' if key == '45' else str(key or 'Addon default / unknown')))
         if state.get('phase', 'installed') != 'installed':
             lines.append('Recovery needed: interrupted installation.')
+        api = state.get('graphics_api')
+        if api:
+            lines.append('Last launch renderer: ' + api)
+            if api.startswith('Direct3D'):
+                lines.append('  ReShade\'s Vulkan layer and the DLSS 5 bridge cannot load on Direct3D.')
+        if 'gpu' in state:
+            capable = state.get('dlss5_capable')
+            verdict = ('supports the tested DLSS 5 runtime' if capable else
+                       'cannot run DLSS 5: the NVIDIA neural runtime needs a GeForce RTX 50-series GPU' if capable is False
+                       else 'DLSS 5 support unknown')
+            lines.append(f'GPU: {state["gpu"] or "not recorded yet"} - {verdict}')
+        if 'reshade_log' in state:
+            lines.append('Last launch: ' + state['reshade_log'])
+            if state.get('addons_loaded'):
+                lines.append('  Add-ons loaded: ' + ', '.join(state['addons_loaded']))
+            elif 'initialized' in state['reshade_log']:
+                lines.append('  No add-ons were loaded; check that the components sit next to Endfield.exe.')
+            if state.get('nr_toggles'):
+                lines.append(f'  NR was switched on {state["nr_toggles"]} time(s) in the last logged session.')
         lines.append('\nSaved settings only. Current neural execution is not measured.')
     if result.get('preserved_user_settings'):
         lines.append('Preserved modified ReShade settings.')

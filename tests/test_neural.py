@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -12,6 +13,10 @@ import neural
 
 
 class NeuralTests(unittest.TestCase):
+    original_graphics_api = staticmethod(neural.graphics_api)
+    original_reshade_details = staticmethod(neural.reshade_details)
+    original_gpu_name = staticmethod(neural.gpu_name)
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -24,12 +29,86 @@ class NeuralTests(unittest.TestCase):
             data = name.encode()
             (self.source / name).write_bytes(data)
             self.hashes[name] = hashlib.sha256(data).hexdigest()
-        for target, value in [('FILES', self.hashes), ('reshade_status', lambda game: True)]:
+        for target, value in [('FILES', self.hashes), ('reshade_status', lambda game: True),
+                              ('reshade_details', lambda game: []),
+                              ('graphics_api', lambda path=None: 'Unknown (test)'),
+                              ('gpu_name', lambda path=None: None)]:
             p = patch.object(neural, target, value); p.start(); self.addCleanup(p.stop)
         p = patch.object(manage, 'game_idle', lambda: None); p.start(); self.addCleanup(p.stop)
 
     def install(self):
         return neural.install(self.game, self.source)
+
+    def test_unsupported_gpu_blocks_install_before_writes(self):
+        with patch.object(neural, 'gpu_name', lambda path=None: 'NVIDIA GeForce RTX 4090 Laptop GPU'):
+            with self.assertRaisesRegex(ValueError, 'RTX 50-series'):
+                self.install()
+        self.assertEqual({p.name for p in self.game.iterdir()}, {'Endfield.exe'})
+        with patch.object(neural, 'gpu_name', lambda path=None: 'NVIDIA GeForce RTX 5070'):
+            self.install()
+        self.assertTrue((self.game / neural.STATE).exists())
+
+    def test_gpu_name_and_dlss5_capability_from_player_log(self):
+        log = self.game / 'Player.log'
+        log.write_text('[Vulkan init] Physical Device 000000007EB3CC90 [0]: "NVIDIA GeForce RTX 4090 Laptop GPU" deviceType=2 vendorID=10de deviceID=2757, apiVersion=1.4.351\n'
+                       '[Vulkan init] Physical Device 000000007EB3CC60 [1]: "Intel(R) RaptorLake-S Mobile Graphics Controller" deviceType=1 vendorID=8086 deviceID=a788, apiVersion=1.3.271\n')
+        self.assertEqual(self.original_gpu_name(log), 'NVIDIA GeForce RTX 4090 Laptop GPU')
+        log.write_text('[Vulkan init] Physical Device 1 [0]: "AMD Radeon(TM) Graphics" deviceType=1 vendorID=1002 deviceID=13c0, apiVersion=1.4.315\n'
+                       '[Vulkan init] Physical Device 2 [1]: "NVIDIA GeForce RTX 5070" deviceType=2 vendorID=10de deviceID=2f04, apiVersion=1.4.351\n')
+        self.assertEqual(self.original_gpu_name(log), 'NVIDIA GeForce RTX 5070')
+        log.write_text('Direct3D:\n    Version:  Direct3D 11.0 [level 11.1]\n    Renderer: NVIDIA GeForce RTX 3080 (ID=0x2206)\n')
+        self.assertEqual(self.original_gpu_name(log), 'NVIDIA GeForce RTX 3080')
+        self.assertIsNone(self.original_gpu_name(self.game / 'absent.log'))
+        for name, expected in [('NVIDIA GeForce RTX 5070', True), ('NVIDIA GeForce RTX 5090 Laptop GPU', True),
+                               ('NVIDIA GeForce RTX 4090 Laptop GPU', False), ('NVIDIA GeForce RTX 3080', False),
+                               ('NVIDIA GeForce GTX 1080', False), ('AMD Radeon RX 7900 XTX', False),
+                               ('Intel(R) Arc(TM) A770', False), ('NVIDIA GeForce RTX PRO 6000', None), (None, None)]:
+            with self.subTest(name=name):
+                self.assertIs(neural.dlss5_capable(name), expected)
+
+    def test_direct3d_launch_blocks_install_before_writes(self):
+        with patch.object(neural, 'graphics_api', lambda path=None: 'Direct3D 12'):
+            with self.assertRaisesRegex(ValueError, 'Direct3D 12'):
+                self.install()
+        self.assertEqual({p.name for p in self.game.iterdir()}, {'Endfield.exe'})
+
+    def test_graphics_api_is_read_from_player_log(self):
+        log = self.game / 'Player.log'
+        log.write_text('Initialize engine version: 2021.3.34f5 (0)\nGfxDevice: creating device client\n'
+                       '[Vulkan init] Physical Device 0 [0]: "GPU" deviceType=2\n')
+        self.assertEqual(neural.graphics_api.__wrapped__(log) if hasattr(neural.graphics_api, '__wrapped__')
+                         else self.original_graphics_api(log), 'Vulkan')
+        log.write_text('Direct3D:\n    Version:  Direct3D 11.0 [level 11.1]\n    Renderer: GPU\n')
+        self.assertEqual(self.original_graphics_api(log), 'Direct3D 11')
+        log.write_text('Initialize engine version: 2021.3.34f5 (0)\n')
+        self.assertIn('Unknown', self.original_graphics_api(log))
+        self.assertIn('Unknown', self.original_graphics_api(self.game / 'absent.log'))
+
+    def test_summary_explains_reshade_and_renderer_evidence(self):
+        (self.game / 'ReShade.log').write_text(
+            "12:00:00:000 [1] | INFO  | Initializing crosire's ReShade version '6.8.0.2155' (64-bit) ...\n"
+            '12:00:00:001 [1] | INFO  | Registered add-on "DLSS 5 Bridge 1.4.13-pre6" v1.4.13.6 using ReShade API version 18.\n'
+            '12:00:00:002 [1] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.828.517 using ReShade API version 18.\n'
+            '12:00:05:000 [1] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR toggled ON via Num 0\n')
+        with patch.object(neural, 'reshade_details', lambda game: ['Endfield.exe is not in the enabled list.']):
+            text = neural.summary(neural.inspect(self.game))
+        self.assertIn('ReShade: Setup needed', text)
+        self.assertIn('not in the enabled list', text)
+        self.assertIn('Add-ons loaded: DLSS 5 Bridge 1.4.13-pre6, DLSS 5 Neural Rendering', text)
+        self.assertIn('switched on 1 time', text)
+        self.assertIn('Last launch renderer: Unknown (test)', text)
+        self.assertIn('GPU: not recorded yet - DLSS 5 support unknown', text)
+        with patch.object(neural, 'gpu_name', lambda path=None: 'NVIDIA GeForce RTX 4090 Laptop GPU'):
+            self.assertIn('cannot run DLSS 5', neural.summary(neural.inspect(self.game)))
+
+    def test_reshade_details_reports_missing_registration(self):
+        with tempfile.TemporaryDirectory() as programdata, patch.dict(os.environ, PROGRAMDATA=programdata):
+            self.assertIn('not set up', ' '.join(self.original_reshade_details(self.game)))
+            root = Path(programdata) / 'ReShade'; root.mkdir()
+            (root / 'ReShadeApps.ini').write_text('Apps=C:\\Other\\Game.exe\n', encoding='utf-8-sig')
+            problems = self.original_reshade_details(self.game)
+            self.assertTrue(any('enabled application list' in p for p in problems))
+            self.assertTrue(any('missing from ProgramData' in p for p in problems))
 
     def test_roundtrip_preserves_original_settings_and_native_dll(self):
         original = b'; keep comment\r\n[INPUT]\r\nKeyOverlay=36,0,0,0\r\n'
