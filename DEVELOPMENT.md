@@ -38,10 +38,12 @@ files were present. The runtime SHA-256 was
    extended gameplay, other renderers, and real-game restore.
 4. Implemented: desktop/CLI managers, presets, live configuration, VSync control,
    background cap, and Epic folder discovery. Python is bundled in standalone EXEs.
-5. Version 0.3.1 implements opt-in graphics controls via a render-loop callback,
+5. Version 0.3.2 implements opt-in graphics controls via a render-loop callback,
    with an exact runtime hash gate, typed APIs, readback, per-feature failure
    isolation, and reset. The legacy graphics DLL remains excluded. Native fake
-   runtime tests pass; actual game callback and feature effects still need testing.
+   runtime tests pass. The actual callback, all 14 parameter readbacks, anisotropic
+   readback, and reset paths were observed in the running game on September 11.
+   Visible effects across rendering modes and long-session stability remain unverified.
 
 The modern FPS component omits the legacy file-hiding hooks and attaches its
 worker before IL2CPP calls. The worker still invokes Unity setters outside the
@@ -78,8 +80,8 @@ means no graphics writes. Each parameter is resolved independently and retained
 with a GC handle while overridden. Values are captured and read back through
 typed getters; OverrideWithString and MarkFeatureDirty request updates. Reset
 restores a preexisting override, or invokes the game's Reset and MarkFeatureDirty
-methods to return control to game settings. Actual engine behavior still needs
-per-feature verification. The known-working FPS-only artifact remains available
+methods to return control to game settings. Live typed readbacks and resets were verified for every exposed control;
+visual effects and sustained stability still need wider gameplay coverage. The known-working FPS-only artifact remains available
 in build/package and the upgrade manager archives installed DLLs before replacing them.
 
 Run the inspector on the game's Endfield_Data/il2cpp_data/Metadata/global-metadata.dat:

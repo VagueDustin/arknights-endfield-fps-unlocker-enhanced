@@ -19,7 +19,7 @@ and other rendering modes remain unverified. This is still an experimental build
 - Opt-in graphics profiles, typed runtime checks, value readback, and reset.
 - Upgrade with preservation of the previous build and its configuration.
 
-Version 0.3.1 adds a navy-and-gold live control app, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
+Version 0.3.2 includes a navy-and-gold live control app, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
 are gated to the inspected runtime SHA-256. Unknown builds retain FPS support
 while graphics are disabled. The old graphics code is excluded from the build.
 
@@ -48,14 +48,14 @@ are logged per parameter; an incompatible feature cannot enable raw-offset write
 ## Use the experimental package
 
 Download the artifact from a successful **Windows build and tests** run on the
-`modernize-fps` branch. Extract the entire package into its own folder. Keep the
+`main` branch. Extract the entire package into its own folder. Keep the
 manager next to `package.json` and the two compiled DLLs.
 
 Run **EndfieldEnhancer.exe**, choose the folder containing `Endfield.exe`, inspect
-it, and install with the game closed. Defaults: 120 FPS, VSync off, no background
-override. If Windows denies write access, run the manager as administrator.
+it, and install with the game closed. The desktop defaults to 144 FPS, VSync off, and a 30 FPS background cap;
+existing settings are loaded when available. CLI defaults are 120 FPS and no background cap. If Windows denies write access, run the manager as administrator.
 
-Launch through the normal game launcher. **Apply settings** updates the runtime
+Launch through the normal game launcher. **Apply live settings** updates the runtime
 within approximately one second. VSync can override the FPS target. Unlimited
 uses Unity's desktop value -1 with VSync off; see
 [Unity's FPS documentation](https://docs.unity3d.com/ScriptReference/Application-targetFrameRate.html).
@@ -142,3 +142,12 @@ The app records managed installation locations. Uninstalling the app restores th
 This repository is independent on GitHub and retains the original project's MIT license and history. No game binaries or private brand repository contents beyond the selected public-facing theme tokens are distributed.
 
 Provided by VagueDustin Enterprises™ · © 2026 Endfield Enhancer. All rights reserved. Source code licensing is governed by LICENSE.
+
+## Live validation
+
+On September 11, 2026, version 0.3.2 connected to the inspected game's render loop.
+Anisotropic filtering, seven sharpening parameters, render scale, four shadow-map
+parameters, GTAO, and TAAU accepted requests and returned matching typed readbacks.
+Every tested override was then reset to game control; the client remained responsive.
+This establishes parameter control, not a benchmark or proof of visible effects
+in every renderer, scene, or upscaling mode. Extended stability testing remains open.
