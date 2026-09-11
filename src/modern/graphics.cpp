@@ -44,7 +44,7 @@ std::mutex configMutex;
 std::atomic<bool> ready{false};
 std::atomic<unsigned> callbackCount{0};
 std::atomic<DWORD> callbackThread{0};
-using BeforeRender = void (*)(const void*);
+using BeforeRender = void (*)(void*, void*, void*, const void*);
 BeforeRender originalBeforeRender = nullptr;
 void* pipelineGetter = nullptr;
 void* anisoGetter = nullptr;
@@ -281,7 +281,7 @@ void OnFrame() {
     DWORD expectedThread = 0;
     callbackThread.compare_exchange_strong(expectedThread, GetCurrentThreadId());
     if (callbackThread.load() != GetCurrentThreadId()) return;
-    if (callbackCount.fetch_add(1) == 0) Log("before-render callback active on thread " + std::to_string(GetCurrentThreadId()));
+    if (callbackCount.fetch_add(1) == 0) Log("render-loop callback active on thread " + std::to_string(GetCurrentThreadId()));
     const auto now = GetTickCount64();
     if (now - lastPoll < 1000) return;
     Config config;
@@ -307,8 +307,8 @@ void OnFrame() {
     }
     for (auto& feature : features) Apply(feature, settings, Desired(feature, config));
 }
-void BeforeRenderHook(const void* method) {
-    originalBeforeRender(method);
+void BeforeRenderHook(void* asset, void* context, void* request, const void* method) {
+    originalBeforeRender(asset, context, request, method);
     // The engine calls this entry point as part of rendering; workers only publish settings.
     OnFrame();
 }
@@ -328,7 +328,7 @@ void Publish(const Config& config) {
 void CheckCallback() {
     static bool reported = false;
     if (ready.load() && !reported && !callbackCount.load() && GetTickCount64() - started > 30000) {
-        Log("waiting for before-render callback; no graphics changes applied"); reported = true;
+        Log("waiting for render-loop callback; no graphics changes applied"); reported = true;
     }
 }
 bool KnownRuntime(const std::wstring& path) {
@@ -368,9 +368,15 @@ bool Initialize(HMODULE module, bool knownRuntime, Logger logger) {
     RESOLVE(newString, "il2cpp_string_new_utf16") RESOLVE(newHandle, "il2cpp_gchandle_new")
     RESOLVE(handleTarget, "il2cpp_gchandle_get_target") RESOLVE(freeHandle, "il2cpp_gchandle_free")
 #undef RESOLVE
-    void* frame = Method(Class("UnityEngine", "Application"), "InvokeOnBeforeRender", 0);
-    if (!Signature(frame, 0x01, true) || !*static_cast<void**>(frame)) {
-        Log("before-render entry point unavailable; graphics disabled"); return false;
+    void* frame = Method(Class("UnityEngine.Rendering", "RenderPipelineManager"), "DoRenderLoop_Internal", 3);
+    unsigned ignoredFlags = 0;
+    // Shipping Unity signature: static void(RenderPipelineAsset, IntPtr, Object).
+    // Do not guess the ABI when the game changes this entry point.
+    if (!frame || api.paramCount(frame) != 3 || api.type(api.returnType(frame)) != 0x01 ||
+        !(api.flags(frame, &ignoredFlags) & 0x10) || api.type(api.paramType(frame, 0)) != 0x12 ||
+        api.type(api.paramType(frame, 1)) != 0x18 || api.type(api.paramType(frame, 2)) != 0x1c ||
+        !*static_cast<void**>(frame)) {
+        Log("render-loop entry point unavailable; graphics disabled"); return false;
     }
     pipelineGetter = Method(Class("UnityEngine.Rendering", "RenderPipelineManager"), "get_currentPipeline", 0);
     if (!Signature(pipelineGetter, 0x12, true)) pipelineGetter = nullptr;
