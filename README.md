@@ -1,6 +1,6 @@
-# Endfield Enhancer (experimental fork)
+# Arknights Endfield FPS Unlocker Enhanced
 
-An FPS and graphics modernization of [EightySixK's unlocker](https://github.com/EightySixK/Arknights-Endfield-FPS-Unlocker).
+A standalone Windows desktop application by **VagueDustin Enterprises** for live FPS control and experimental graphics tuning in Arknights: Endfield. Built from an FPS and graphics modernization of [EightySixK's unlocker](https://github.com/EightySixK/Arknights-Endfield-FPS-Unlocker).
 New code lives in `src/modern`. Historical upstream binaries in `bin` are not used.
 An initial gameplay test on September 11, 2026 was reported working by the user;
 runtime logs also confirm foreground/background target changes. Extended stability
@@ -17,7 +17,7 @@ and other rendering modes remain unverified. This is still an experimental build
 - Opt-in graphics profiles, typed runtime checks, value readback, and reset.
 - Upgrade with preservation of the previous build and its configuration.
 
-Version 0.3.0 adds experimental graphics controls. They default to **Game** and
+Version 0.3.1 adds a navy-and-gold live control app, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
 are gated to the inspected runtime SHA-256. Unknown builds retain FPS support
 while graphics are disabled. The old graphics code is excluded from the build.
 
@@ -36,7 +36,7 @@ Apply one control at a time during initial gameplay validation. These settings
 can affect GPU load, and a successful readback does not prove a visible effect in
 every rendering/upscaling mode.
 
-Graphics changes run only when Unity invokes its before-render entry point. The
+Graphics changes run only when Unity invokes its render-loop entry point. The
 worker thread publishes requests; it never applies graphics changes. Named,
 typed methods update parameters, mark their features dirty, and read values back.
 The runtime retains original parameter objects with GC handles and restores an
@@ -128,3 +128,15 @@ separately, then restore and verify a clean launch. Verify each graphics control
 visually and inspect its runtime readback before treating it as game-validated.
 
 MIT license. Original copyright and attribution are preserved in LICENSE.
+
+## Windows app and installer
+
+Download the setup executable from this repository's releases, or the `EndfieldEnhancer-setup` Actions artifact while a release is in testing. Setup installs the desktop app under your user profile and adds a Start menu shortcut. Open the app, select the game folder, and choose **Install / update** with the game closed.
+
+Use **Apply live settings** during gameplay. The header reports the running process and the last cap acknowledged by its runtime log; it does not measure actual FPS. Graphics controls remain experimental and report availability in the runtime log.
+
+The app records managed installation locations. Uninstalling the app restores those game installations first; if a game is running or its files have changed, uninstall stops and retains the app for recovery. Original backups are retained in the game directory.
+
+This repository is independent on GitHub and retains the original project's MIT license and history. No game binaries or private brand repository contents beyond the selected public-facing theme tokens are distributed.
+
+Provided by VagueDustin Enterprises™ · © 2026 Endfield Enhancer. All rights reserved. Source code licensing is governed by LICENSE.

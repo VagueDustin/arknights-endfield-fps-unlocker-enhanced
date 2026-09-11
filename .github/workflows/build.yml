@@ -27,11 +27,20 @@ jobs:
           python tools/package_build.py build/package
       - name: Build standalone manager
         run: |
-          python -m pip install pyinstaller==6.16.0
+          python -m pip install pyinstaller==6.16.0 customtkinter==5.2.2 pillow==11.3.0
           python -m PyInstaller --noconfirm --clean --onefile --name EndfieldManager --distpath build/package tools/manage.py
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name EndfieldEnhancer --distpath build/package tools/desktop.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all customtkinter --add-data "assets;assets" --name EndfieldEnhancer --distpath build/package tools/desktop.py
           build/package/EndfieldManager.exe profiles
+          python tools/package_notices.py build/package
+          $app = Start-Process build/package/EndfieldEnhancer.exe -ArgumentList "--smoke-test" -WindowStyle Hidden -PassThru -Wait
+          if ($app.ExitCode -ne 0) { throw "Desktop smoke test failed" }
+      - name: Build Windows installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/EndfieldEnhancer.iss'
       - uses: actions/upload-artifact@v4
         with:
           name: EndfieldEnhancer-windows-x64-experimental
           path: build/package/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EndfieldEnhancer-setup
+          path: build/installer/*.exe

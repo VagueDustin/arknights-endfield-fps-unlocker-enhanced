@@ -1,250 +1,187 @@
-"""Small desktop control panel for the reversible FPS package."""
+"""VagueDustin Enterprises live desktop control panel."""
+import ctypes
+import datetime
 import json
-import configparser
 import os
 from pathlib import Path
 import queue
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-
+from tkinter import messagebox
+import customtkinter as ctk
+from PIL import Image, ImageColor, ImageTk
 import manage
+import live_status
+import desktop_state
+from desktop_legacy import Panel as Actions, find_game
 
+ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent)) / 'assets'
+TOKENS = json.loads((ASSETS / 'brand.json').read_text(encoding='utf-8-sig'))
+def color(role):
+    group, name = role.split('.')
+    return TOKENS[group][name]
 
-def find_game():
-    manifests = Path(os.environ.get('PROGRAMDATA', 'C:/ProgramData')) / 'Epic/EpicGamesLauncher/Data/Manifests'
-    for path in manifests.glob('*.item'):
-        try:
-            data = json.loads(path.read_text(encoding='utf-8-sig'))
-            if 'endfield' not in data.get('DisplayName', '').lower():
-                continue
-            root = Path(data['InstallLocation'])
-            for candidate in (root, root / 'games/EndField Game'):
-                if (candidate / 'Endfield.exe').is_file():
-                    return str(candidate)
-        except (OSError, ValueError, KeyError):
-            continue
-    return ''
+def register_fonts():
+    if os.name == 'nt':
+        for font in (ASSETS / 'fonts').glob('*.ttf'):
+            ctypes.windll.gdi32.AddFontResourceExW(str(font), 0x10, 0)
 
+class CanvasLabel:
+    def __init__(self,canvas,x,y,text,size,role):
+        self.canvas=canvas; self.y=y
+        self.item=canvas.create_text(x,y,text=text,anchor='e',fill=color(role),font=('Inter',-size))
+    def configure(self,text=None,text_color=None):
+        if text is not None:self.canvas.itemconfigure(self.item,text=text)
+        if text_color is not None:self.canvas.itemconfigure(self.item,fill=text_color)
+    def move(self,x):self.canvas.coords(self.item,x,self.y)
 
-class Panel:
+class Panel(Actions):
     def __init__(self, window):
         self.window = window
-        window.title('Endfield Enhancer — experimental')
-        window.geometry('860x810')
-        window.minsize(820, 740)
+        window.title('Arknights Endfield FPS Unlocker • Enhanced')
+        window.geometry('1100x860')
+        window.minsize(960, 740)
+        window.configure(fg_color=color('surface.base'))
         window.protocol('WM_DELETE_WINDOW', self.close)
         self.events = queue.Queue()
+        self.live_events = queue.Queue()
         self.busy = False
-        body = ttk.Frame(window, padding=20)
-        body.pack(fill='both', expand=True)
-        ttk.Label(body, text='Endfield Enhancer', font=('Segoe UI', 20, 'bold')).pack(anchor='w')
-        ttk.Label(body, text='FPS controls • Reversible installation • Runtime diagnostics').pack(anchor='w', pady=(0, 18))
-        ttk.Label(body, text='Game folder (contains Endfield.exe)').pack(anchor='w')
-        row = ttk.Frame(body)
-        row.pack(fill='x', pady=(4, 14))
-        self.game = tk.StringVar(value=find_game())
-        ttk.Entry(row, textvariable=self.game).pack(side='left', fill='x', expand=True)
-        ttk.Button(row, text='Browse…', command=self.browse).pack(side='left', padx=(8, 0))
-        controls = ttk.LabelFrame(body, text='FPS profile', padding=12)
-        controls.pack(fill='x')
-        self.preset = tk.StringVar(value='balanced')
-        self.fps = tk.StringVar(value='120')
-        self.background = tk.StringVar(value='0')
-        self.vsync = tk.StringVar(value='Off')
-        ttk.Label(controls, text='Preset').grid(row=0, column=0, sticky='w', padx=(0, 12))
-        preset = ttk.Combobox(controls, textvariable=self.preset,
-                              values=[*manage.PRESETS, 'custom'], state='readonly', width=18)
-        preset.grid(row=0, column=1, sticky='w')
-        preset.bind('<<ComboboxSelected>>', self.choose_preset)
-        self.fps.trace_add('write', self.update_preset)
-        for index, (label, variable) in enumerate((('FPS (−1 = unlimited)', self.fps),
-                                                  ('Background FPS (0 = off)', self.background)), 1):
-            ttk.Label(controls, text=label).grid(row=index, column=0, sticky='w', pady=7)
-            ttk.Entry(controls, textvariable=variable, width=21).grid(row=index, column=1, sticky='w')
-        ttk.Label(controls, text='VSync').grid(row=3, column=0, sticky='w')
-        ttk.Combobox(controls, textvariable=self.vsync, state='readonly', width=18,
-            values=['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes', 'Every 3 refreshes', 'Every 4 refreshes']).grid(row=3, column=1, sticky='w')
-        ttk.Label(controls, text='VSync can take priority over your FPS cap.\nApply settings while playing; install or restore with the game closed.',
-                  wraplength=340).grid(row=0, column=2, rowspan=4, padx=22, sticky='nw')
-        graphics = ttk.LabelFrame(body, text='Graphics — experimental', padding=12)
-        graphics.pack(fill='x', pady=12)
-        self.graphics_preset = tk.StringVar(value='game')
-        ttk.Label(graphics, text='Profile').grid(row=0, column=0, sticky='w')
-        graphics_preset = ttk.Combobox(graphics, textvariable=self.graphics_preset,
-            values=[*manage.GRAPHICS_PRESETS, 'custom'], state='readonly', width=18)
-        graphics_preset.grid(row=0, column=1, sticky='w', pady=(0, 8))
-        graphics_preset.bind('<<ComboboxSelected>>', self.choose_graphics_preset)
-        self.graphics_vars = {key: tk.StringVar(value='Game') for key in manage.GRAPHICS_DEFAULTS}
-        self.graphics_choices = {
-            'Anisotropic': ['Game', 'Off', 'Per texture', 'Force on'],
-            'ShadowResolution': ['Game', '512', '1024', '2048', '4096'],
-            'AmbientOcclusion': ['Game', 'Off', 'On'], 'TemporalAA': ['Game', 'Off', 'On'],
-        }
-        for index, (key, label) in enumerate((('Anisotropic', 'Anisotropic filtering'),
-                ('Sharpening', 'Sharpening (%)'), ('RenderScale', 'Render scale (%)'),
-                ('ShadowResolution', 'Shadow maps (px)'), ('AmbientOcclusion', 'Ambient occlusion'),
-                ('TemporalAA', 'Temporal AA (TAAU)'))):
-            row, column = 1 + index // 2, (index % 2) * 2
-            ttk.Label(graphics, text=label).grid(row=row, column=column, sticky='w', padx=(0, 8), pady=4)
-            if key in self.graphics_choices:
-                widget = ttk.Combobox(graphics, textvariable=self.graphics_vars[key],
-                    values=self.graphics_choices[key], state='readonly', width=18)
-            else:
-                widget = ttk.Entry(graphics, textvariable=self.graphics_vars[key], width=21)
-            widget.grid(row=row, column=column + 1, sticky='w', padx=(0, 18))
-            self.graphics_vars[key].trace_add('write', self.update_graphics_preset)
-        ttk.Label(graphics, text='Game releases the override. Apply one control at a time; diagnostics show accepted values.\nTAAU controls the game’s temporal AA, not DLSS/FSR. Render scale and shadows can increase GPU load.',
-            wraplength=770).grid(row=4, column=0, columnspan=4, sticky='w', pady=(8, 0))
-        actions = ttk.Frame(body)
-        actions.pack(fill='x')
+        self.closed = threading.Event()
         self.buttons = []
-        for label, action in [('Inspect', 'inspect'), ('Install/update', 'install'),
-                              ('Apply settings', 'configure'), ('Reset graphics', 'reset_graphics'),
-                              ('Previous build', 'rollback'), ('Uninstall', 'restore'), ('Diagnostics', 'diagnostics')]:
-            button = ttk.Button(actions, text=label, command=lambda action=action: self.run(action))
-            button.pack(side='left', padx=(0, 6))
-            self.buttons.append(button)
-        self.status = tk.StringVar(value='Experimental build. Inspect your installation to begin.')
-        ttk.Label(body, textvariable=self.status, wraplength=720).pack(anchor='w', pady=10)
-        self.output = tk.Text(body, height=10, wrap='word', font=('Consolas', 10), state='disabled')
-        self.output.pack(fill='both', expand=True)
+        self.status = tk.StringVar(value='Ready. Changes apply while the game is running.')
+        self.game = tk.StringVar(value=desktop_state.selected() or find_game())
+        self.fps = tk.StringVar(value='144')
+        self.background = tk.StringVar(value='30')
+        self.vsync = tk.StringVar(value='Off')
+        self.preset = tk.StringVar(value='high-refresh')
+        self.graphics_preset = tk.StringVar(value='game')
+        self.graphics_vars = {key: tk.StringVar(value='Game') for key in manage.GRAPHICS_DEFAULTS}
+        self.graphics_choices = {'Anisotropic': ['Game', 'Off', 'Per texture', 'Force on'],
+                                 'AmbientOcclusion': ['Game', 'Off', 'On'], 'TemporalAA': ['Game', 'Off', 'On']}
+        self.header = tk.Canvas(window, bg=color('surface.base'), height=135, highlightthickness=0)
+        self.header.pack(fill='x')
+        # A static radial depth wash, derived entirely from the house semantic roles.
+        base = ImageColor.getrgb(color('surface.base'))
+        blue = ImageColor.getrgb(color('surface.highest'))
+        gold = ImageColor.getrgb(color('accent.default'))
+        wash = Image.new('RGB', (1100, 135))
+        pixels = wash.load()
+        for y in range(135):
+            for x in range(1100):
+                a = max(0, 1-((x-170)/900)**2-((y+10)/220)**2)*0.6
+                b = max(0, 1-((x-950)/550)**2-((y+50)/230)**2)*0.07
+                pixels[x,y] = tuple(int(base[i]*(1-a-b)+blue[i]*a+gold[i]*b) for i in range(3))
+        self.wash = ImageTk.PhotoImage(wash)
+        self.header.create_image(0,0,image=self.wash,anchor='nw')
+        self.header.create_text(30,25,text='V A G U E D U S T I N   E N T E R P R I S E S',anchor='w',fill=color('accent.default'),font=('Inter',-11))
+        self.header.create_text(28,62,text='ENDFIELD',anchor='w',fill=color('text.primary'),font=('Cinzel',-32))
+        self.header.create_text(30,102,text='FPS UNLOCKER  /  ENHANCED',anchor='w',fill=color('text.muted'),font=('Inter',-13))
+        self.live_badge = CanvasLabel(self.header,1070,30,'WAITING FOR GAME',12,'text.muted')
+        self.cap_badge = CanvasLabel(self.header,1070,65,'Applied cap —',20,'text.primary')
+        self.callback_badge = CanvasLabel(self.header,1070,104,'Waiting for runtime',12,'text.muted')
+        self.header.bind('<Configure>',lambda event: [badge.move(event.width-30) for badge in (self.live_badge,self.cap_badge,self.callback_badge)])
+        pathrow = ctk.CTkFrame(window, fg_color='transparent')
+        pathrow.pack(fill='x', padx=30, pady=(10,14))
+        self.entry(pathrow, self.game).pack(side='left',fill='x',expand=True,padx=(0,10))
+        self.button(pathrow,'Game folder…',self.browse,False).pack(side='right')
+        tabs = ctk.CTkTabview(window, fg_color=color('surface.base'),
+            segmented_button_fg_color=color('surface.raised'), segmented_button_selected_color=color('surface.highest'),
+            segmented_button_selected_hover_color=color('surface.highest'), segmented_button_unselected_color=color('surface.raised'),
+            segmented_button_unselected_hover_color=color('surface.highest'), text_color=color('text.primary'))
+        tabs.pack(fill='both',expand=True,padx=20)
+        performance=tabs.add('Performance'); graphics_tab=tabs.add('Graphics'); recovery=tabs.add('Recovery & logs')
+        graphics=ctk.CTkScrollableFrame(graphics_tab,fg_color=color('surface.base'));graphics.pack(fill='both',expand=True)
+        self.section(performance,'Your refresh rate. Your rules.','Set your target, keep the game running, and apply changes instantly.')
+        presets=ctk.CTkFrame(performance,fg_color='transparent'); presets.pack(fill='x',pady=16)
+        for text,value in [('120 FPS','120'),('144 FPS','144'),('240 FPS','240'),('Unlimited','-1')]:
+            self.button(presets,text,lambda value=value:self.fps.set(value),False).pack(side='left',padx=(0,10),expand=True,fill='x')
+        self.field(performance,'Target FPS','−1 removes the cap', self.fps)
+        self.field(performance,'Background FPS','Lower the cap when you switch away; 0 disables this limit',self.background)
+        self.field(performance,'VSync','Choose how frames synchronize with your display', self.vsync,
+                   ['Game setting','Off','Every refresh','Every 2 refreshes','Every 3 refreshes','Every 4 refreshes'])
+        self.label(performance,'The applied cap is reported by the runtime. It is not a measured FPS counter.',12,'text.muted').pack(anchor='w',pady=18)
+        self.section(graphics,'Tune the view.','Experimental controls. Game leaves each option under the game’s control.')
+        for key,title,hint,values in [
+            ('Anisotropic','Anisotropic filtering','Texture filtering mode',self.graphics_choices['Anisotropic']),
+            ('Sharpening','Sharpening','Game or 0–100 percent',None),
+            ('RenderScale','Render scale','Game or 50–200 percent; higher values increase GPU load',None),
+            ('ShadowResolution','Shadow resolution','Maximum tile resolution',['Game','512','1024','2048','4096']),
+            ('AmbientOcclusion','Ambient occlusion','Screen-space contact shading',self.graphics_choices['AmbientOcclusion']),
+            ('TemporalAA','Temporal anti-aliasing','Controls TAAU; does not select DLSS or FSR',self.graphics_choices['TemporalAA'])]:
+            self.field(graphics,title,hint,self.graphics_vars[key],values)
+        self.button(graphics,'Reset graphics to game settings',lambda:self.run('reset_graphics'),False).pack(anchor='w',pady=10)
+        self.section(recovery,'Keep a way back.','Upgrade, restore the original game files, or return to the previous build.')
+        recoveryrow=ctk.CTkFrame(recovery,fg_color='transparent'); recoveryrow.pack(fill='x',pady=16)
+        for label,action in [('Inspect installation','inspect'),('Previous build','rollback'),('Restore game files','restore')]:
+            self.button(recoveryrow,label,lambda action=action:self.run(action),False).pack(side='left',padx=(0,10))
+        self.output=ctk.CTkTextbox(recovery,fg_color=color('surface.sunken'),text_color=color('text.muted'),font=('Inter',12),height=220)
+        self.output.pack(fill='both',expand=True); self.output.configure(state='disabled')
+        self.runtime_output=ctk.CTkTextbox(recovery,fg_color=color('surface.sunken'),text_color=color('text.muted'),font=('Inter',11),height=120)
+        self.runtime_output.pack(fill='x',pady=(8,0)); self.runtime_output.configure(state='disabled')
+        bottom=ctk.CTkFrame(window,fg_color=color('surface.raised'),corner_radius=0)
+        bottom.pack(fill='x',pady=(10,0))
+        self.label(bottom,'',12,'text.muted',textvariable=self.status,wraplength=610).pack(side='left',padx=24,pady=16)
+        self.button(bottom,'Apply live settings',lambda:self.run('configure')).pack(side='right',padx=(8,24),pady=16)
+        self.button(bottom,'Install / update',lambda:self.run('install'),False).pack(side='right',pady=16)
+        self.label(window,f'Provided by VagueDustin Enterprises™ · © {datetime.date.today().year} Endfield Enhancer. All rights reserved.',11,'text.faint').pack(pady=10)
         self.load_profile()
-        window.after(100, self.poll)
-
-    def choose_preset(self, _):
-        if self.preset.get() in manage.PRESETS:
-            self.fps.set(str(manage.PRESETS[self.preset.get()]))
-
-    def graphics_values(self):
-        result = {}
-        for key, variable in self.graphics_vars.items():
-            text = variable.get().strip()
-            if text.lower() == 'game':
-                result[key] = -1
-            elif key in ('Anisotropic', 'AmbientOcclusion', 'TemporalAA'):
-                result[key] = self.graphics_choices[key].index(text) - 1
-            else:
-                result[key] = int(text)
-        return result
-
-    def show_graphics(self, values):
-        for key, value in values.items():
-            text = 'Game' if value == -1 else str(value)
-            if value >= 0 and key in ('Anisotropic', 'AmbientOcclusion', 'TemporalAA'):
-                text = self.graphics_choices[key][value + 1]
-            self.graphics_vars[key].set(text)
-
-    def choose_graphics_preset(self, _):
-        values = manage.GRAPHICS_PRESETS.get(self.graphics_preset.get())
-        if values is not None:
-            self.show_graphics(values)
-
-    def update_graphics_preset(self, *_):
-        try:
-            current = self.graphics_values()
-            self.graphics_preset.set(next((name for name, values in manage.GRAPHICS_PRESETS.items()
-                                           if current == values), 'custom'))
-        except ValueError:
-            self.graphics_preset.set('custom')
-
-    def update_preset(self, *_):
-        self.preset.set(next((name for name, value in manage.PRESETS.items()
-                             if str(value) == self.fps.get()), 'custom'))
-
-    def close(self):
-        if self.busy:
-            messagebox.showinfo('Action in progress', 'Wait for the current action to finish before closing.')
-        else:
-            self.window.destroy()
-
-    def load_profile(self):
-        path = Path(self.game.get()) / manage.CONFIG
-        if not path.is_file() or path.is_symlink():
-            return
-        try:
-            config = configparser.ConfigParser()
-            config.read(path)
-            fps = config['FPS'].getint('Target')
-            background = config['FPS'].getint('Background')
-            vsync = config['FPS'].getint('VSync')
-            graphics = {key: config.getint('Graphics', key, fallback=-1) for key in manage.GRAPHICS_DEFAULTS}
-            manage.settings(fps, background, vsync, graphics)
-            self.fps.set(str(fps))
-            self.background.set(str(background))
-            self.vsync.set(['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes',
-                           'Every 3 refreshes', 'Every 4 refreshes'][vsync + 1])
-            self.show_graphics(graphics)
-        except (OSError, ValueError, KeyError, configparser.Error):
-            self.status.set('Could not read existing settings; inspect the installation before applying changes.')
-
-    def browse(self):
-        selected = filedialog.askdirectory(title='Select Endfield game folder')
-        if selected:
-            self.game.set(selected)
-            self.load_profile()
-
-    def run(self, action):
-        if self.busy:
-            return
-        try:
-            game = Path(self.game.get()).resolve(strict=True)
-            if not (game / 'Endfield.exe').is_file():
-                raise ValueError('Select the folder containing Endfield.exe')
-            fps = int(self.fps.get())
-            background = int(self.background.get())
-            vsync = ['Game setting', 'Off', 'Every refresh', 'Every 2 refreshes',
-                     'Every 3 refreshes', 'Every 4 refreshes'].index(self.vsync.get()) - 1
-            graphics_values = self.graphics_values()
-            config = manage.settings(fps, background, vsync, graphics_values)
-        except (ValueError, OSError) as error:
-            messagebox.showerror('Check settings', str(error))
-            return
-        self.busy = True
-        for button in self.buttons:
-            button.configure(state='disabled')
-        self.status.set(f'{action.capitalize()} in progress…')
-        def worker():
-            try:
-                with manage.locked(game):
-                    if action == 'install':
-                        function = manage.upgrade if manage.state_path(game).exists() else manage.install
-                        result = function(game, manage.package_directory(), config)
-                    elif action == 'restore':
-                        result = manage.restore(game)
-                    elif action == 'configure':
-                        result = manage.configure(game, fps, background, vsync, graphics_values)
-                    elif action == 'reset_graphics':
-                        result = manage.configure(game, graphics=manage.GRAPHICS_DEFAULTS)
-                    elif action == 'rollback':
-                        result = manage.rollback(game)
-                    else:
-                        result = manage.diagnostics(game)
-                self.events.put((True, json.dumps(result, indent=2)))
-            except Exception as error:
-                self.events.put((False, str(error)))
-        threading.Thread(target=worker, daemon=True).start()
-
+        if manage.state_path(Path(self.game.get())).exists():
+            desktop_state.remember(Path(self.game.get()))
+        window.after(100,self.poll)
+        threading.Thread(target=self.watch,daemon=True).start()
+    def label(self,parent,text,size=14,role='text.primary',display=False,**kw):
+        return ctk.CTkLabel(parent,text=text,text_color=color(role),font=('Cinzel' if display else 'Inter',size),**kw)
+    def button(self,parent,text,command,primary=True):
+        button=ctk.CTkButton(parent,text=text,command=command,height=38,corner_radius=7,font=('Inter',13),
+            fg_color=color('accent.default' if primary else 'surface.highest'),hover_color=color('accent.hover' if primary else 'surface.overlay'),
+            text_color=color('text.inverse' if primary else 'text.primary'),border_width=0 if primary else 1,border_color=color('border.default'))
+        self.buttons.append(button); return button
+    def entry(self,parent,variable):
+        return ctk.CTkEntry(parent,textvariable=variable,height=38,fg_color=color('surface.sunken'),text_color=color('text.primary'),border_color=color('border.default'),font=('Inter',13))
+    def section(self,parent,title,subtitle):
+        self.label(parent,title,22,display=True).pack(anchor='w',pady=(12,4))
+        self.label(parent,subtitle,13,'text.muted').pack(anchor='w',pady=(0,8))
+    def field(self,parent,title,hint,variable,values=None):
+        row=ctk.CTkFrame(parent,fg_color=color('surface.raised'),corner_radius=8)
+        row.pack(fill='x',pady=4)
+        left=ctk.CTkFrame(row,fg_color='transparent');left.pack(side='left',padx=16,pady=9)
+        self.label(left,title,14).pack(anchor='w'); self.label(left,hint,11,'text.muted').pack(anchor='w')
+        if values:
+            widget=ctk.CTkOptionMenu(row,variable=variable,values=values,width=185,height=34,font=('Inter',12),
+                fg_color=color('surface.highest'),button_color=color('surface.highest'),button_hover_color=color('accent.pressed'),
+                text_color=color('text.primary'),dropdown_fg_color=color('surface.raised'),dropdown_text_color=color('text.primary'),dropdown_hover_color=color('surface.highest'))
+        else: widget=self.entry(row,variable)
+        widget.pack(side='right',padx=16,pady=9)
+    def watch(self):
+        while not self.closed.is_set():
+            try: self.live_events.put(live_status.snapshot())
+            except Exception as error: self.live_events.put({'error':str(error)})
+            self.closed.wait(2)
     def poll(self):
         try:
-            success, result = self.events.get_nowait()
-            self.busy = False
-            for button in self.buttons:
-                button.configure(state='normal')
-            self.status.set('Finished. See details below.' if success else 'Action stopped. See details below.')
-            self.output.configure(state='normal')
-            self.output.delete('1.0', 'end')
-            self.output.insert('1.0', result)
-            self.output.configure(state='disabled')
-            if success:
-                self.load_profile()
-        except queue.Empty:
-            pass
-        self.window.after(100, self.poll)
+            success,result=self.events.get_nowait();self.busy=False
+            for button in self.buttons:button.configure(state='normal')
+            self.status.set('Settings saved. Check runtime status for confirmation.' if success else 'Action stopped. Details are in Recovery & logs.')
+            self.output.configure(state='normal');self.output.delete('1.0','end');self.output.insert('1.0',result);self.output.configure(state='disabled')
+            if success:self.load_profile()
+        except queue.Empty:pass
+        try:
+            data=self.live_events.get_nowait()
+            if 'error' in data:self.callback_badge.configure(text='Runtime status unavailable')
+            else:
+                self.live_badge.configure(text=f"● GAME RUNNING  ·  {data['pid']}" if data['running'] else 'WAITING FOR GAME',text_color=color('status.live' if data['running'] else 'text.muted'))
+                cap=data['cap'];self.cap_badge.configure(text='Applied cap —' if cap is None else ('Uncapped' if cap==-1 else f'{cap} FPS applied cap'))
+                self.callback_badge.configure(text=data['graphics'])
+                self.runtime_output.configure(state='normal');self.runtime_output.delete('1.0','end');self.runtime_output.insert('1.0','\n'.join(data['lines']));self.runtime_output.configure(state='disabled');self.runtime_output.see('end')
+        except queue.Empty:pass
+        self.window.after(150,self.poll)
+    def close(self):
+        if self.busy:messagebox.showinfo('Action in progress','Wait for the current action to finish before closing.')
+        else:self.closed.set();self.window.destroy()
 
-
-if __name__ == '__main__':
-    root = tk.Tk()
-    Panel(root)
-    root.mainloop()
+if __name__=='__main__':
+    register_fonts();ctk.set_appearance_mode('dark');root=ctk.CTk();panel=Panel(root)
+    if '--smoke-test' in sys.argv:
+        root.withdraw();root.update();panel.close()
+    else:root.mainloop()

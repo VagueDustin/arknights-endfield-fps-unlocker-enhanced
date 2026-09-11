@@ -101,7 +101,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
     std::error_code error;
     std::filesystem::create_directories(logDirectory, error);
     logPath = logDirectory / (L"runtime-" + std::to_wstring(GetCurrentProcessId()) + L".log");
-    Log("Starting runtime 0.3.0. Graphics controls are opt-in.");
+    Log("Starting runtime 0.3.1. Graphics controls are opt-in.");
     if (!std::filesystem::is_regular_file(configPath, error)) {
         Log("Configuration missing; no overrides installed.");
         return 1;

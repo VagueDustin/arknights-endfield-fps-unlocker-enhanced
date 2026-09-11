@@ -343,7 +343,7 @@ def diagnostics(game):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback'])
+    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics', 'upgrade', 'rollback', 'restore-recorded'])
     parser.add_argument('--game', type=Path)
     parser.add_argument('--package', type=Path, default=package_directory())
     group = parser.add_mutually_exclusive_group()
@@ -358,6 +358,13 @@ def main():
     if args.command == 'profiles':
         print(json.dumps({'fps_presets': PRESETS, 'graphics_presets': GRAPHICS_PRESETS}, indent=2))
         return 0
+    if args.command == 'restore-recorded':
+        try:
+            from desktop_state import restore_recorded
+            print(json.dumps(restore_recorded()))
+            return 0
+        except (OSError, ValueError, KeyError, RuntimeError) as error:
+            parser.exit(2, f'{error}\n')
     if not args.game:
         parser.error('--game is required')
     try:
