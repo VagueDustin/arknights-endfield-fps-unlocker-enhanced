@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <vector>
@@ -32,8 +33,6 @@ struct Api {
     unsigned (*flags)(void*, unsigned*);
     int (*type)(const void*);
     void* (*newString)(const wchar_t*, int);
-    const wchar_t* (*stringChars)(void*);
-    int (*stringLength)(void*);
     unsigned (*newHandle)(void*, bool);
     void* (*handleTarget)(unsigned);
     void (*freeHandle)(unsigned);
@@ -111,13 +110,21 @@ bool Invoke(void* method, void* object, void** parameters, void*& result) {
     result = api.invoke(method, object, parameters, &exception);
     return !exception;
 }
-bool ReadString(void* method, void* object, std::wstring& text) {
+bool ReadValue(void* method, void* object, int type, std::wstring& text) {
     void* result = nullptr;
     if (!Invoke(method, object, nullptr, result) || !result) return false;
-    const int count = api.stringLength(result);
-    const wchar_t* chars = api.stringChars(result);
-    if (!chars || count < 0 || count > 128) return false;
-    text.assign(chars, static_cast<size_t>(count));
+    void* value = api.unbox(result);
+    if (!value) return false;
+    if (type == 0x02) text = *static_cast<bool*>(value) ? L"True" : L"False";
+    else if (type == 0x08) text = std::to_wstring(*static_cast<int*>(value));
+    else if (type == 0x0c) {
+        const float number = *static_cast<float*>(value);
+        if (!std::isfinite(number)) return false;
+        std::wostringstream stream;
+        stream.imbue(std::locale::classic());
+        stream << std::setprecision(std::numeric_limits<float>::max_digits10) << number;
+        text = stream.str();
+    } else return false;
     return true;
 }
 bool ReadBool(void* method, void* object, bool& value) {
@@ -145,9 +152,9 @@ bool ResolveParameter(void* object, int expectedType, Methods& methods) {
     const char* space = api.classNamespace(klass);
     if (!name || !space || std::strncmp(name, "SettingParameter", 16) || std::strcmp(space, "HG.Rendering.Runtime")) return false;
     void* typedValue = Method(klass, "get_paramValue", 0);
-    methods = {Method(klass, "get_valueString", 0), Method(klass, "get_overrided", 0),
+    methods = {typedValue, Method(klass, "get_overrided", 0),
         Method(klass, "OverrideWithString", 1), Method(klass, "Reset", 0), Method(klass, "MarkFeatureDirty", 0)};
-    return Signature(typedValue, expectedType, false) && Signature(methods.value, 0x0e, false) &&
+    return Signature(typedValue, expectedType, false) &&
         Signature(methods.overridden, 0x02, false) && Signature(methods.overrideValue, 0x02, false, 0x0e) &&
         Signature(methods.reset, 0x01, false) && Signature(methods.dirty, 0x01, false);
 }
@@ -210,7 +217,7 @@ void Apply(Feature& feature, void* settings, const std::wstring& desired) {
         Status(feature, "unavailable: typed update/reset API"); return;
     }
     if (!feature.handle) {
-        if (!ReadString(methods.value, object, feature.original) ||
+        if (!ReadValue(methods.value, object, feature.expectedType, feature.original) ||
             !ReadBool(methods.overridden, object, feature.originallyOverridden)) {
             Status(feature, "unavailable: original value"); return;
         }
@@ -224,7 +231,7 @@ void Apply(Feature& feature, void* settings, const std::wstring& desired) {
         Status(feature, "update rejected; original restored when possible"); return;
     }
     std::wstring actual;
-    if (!ReadString(methods.value, object, actual)) {
+    if (!ReadValue(methods.value, object, feature.expectedType, actual)) {
         Restore(feature); feature.rejected = desired;
         Status(feature, "readback failed; original restored when possible"); return;
     }
@@ -358,8 +365,7 @@ bool Initialize(HMODULE module, bool knownRuntime, Logger logger) {
     RESOLVE(classNamespace, "il2cpp_class_get_namespace") RESOLVE(returnType, "il2cpp_method_get_return_type")
     RESOLVE(paramType, "il2cpp_method_get_param") RESOLVE(paramCount, "il2cpp_method_get_param_count")
     RESOLVE(flags, "il2cpp_method_get_flags") RESOLVE(type, "il2cpp_type_get_type")
-    RESOLVE(newString, "il2cpp_string_new_utf16") RESOLVE(stringChars, "il2cpp_string_chars")
-    RESOLVE(stringLength, "il2cpp_string_length") RESOLVE(newHandle, "il2cpp_gchandle_new")
+    RESOLVE(newString, "il2cpp_string_new_utf16") RESOLVE(newHandle, "il2cpp_gchandle_new")
     RESOLVE(handleTarget, "il2cpp_gchandle_get_target") RESOLVE(freeHandle, "il2cpp_gchandle_free")
 #undef RESOLVE
     void* frame = Method(Class("UnityEngine", "Application"), "InvokeOnBeforeRender", 0);

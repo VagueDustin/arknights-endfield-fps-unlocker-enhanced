@@ -38,14 +38,16 @@ files were present. The runtime SHA-256 was
    extended gameplay, other renderers, and real-game restore.
 4. Implemented: desktop/CLI managers, presets, live configuration, VSync control,
    background cap, and Epic folder discovery. Python is bundled in standalone EXEs.
-5. Pending: individually validated graphics controls. The UI explicitly marks them
-   disabled; no legacy graphics DLL is built or installed.
+5. Version 0.3.0 implements opt-in graphics controls via a before-render callback,
+   with an exact runtime hash gate, typed APIs, readback, per-feature failure
+   isolation, and reset. The legacy graphics DLL remains excluded. Native fake
+   runtime tests pass; actual game callback and feature effects still need testing.
 
 The modern FPS component omits the legacy file-hiding hooks and attaches its
 worker before IL2CPP calls. The worker still invokes Unity setters outside the
 game's main thread; the fake runtime test cannot establish that the current
-Unity player permits these calls. This needs explicit gameplay validation or a
-verified main-thread dispatch path before any stable-release claim.
+Unity player permits these calls. Initial user gameplay is successful; extended
+testing or moving FPS application to a verified main-thread path remains desirable.
 The legacy graphics component uses hardcoded
 field offsets and custom trampoline code; export availability does not validate
 either. Crash reports are useful leads, not a reproduction on this installation.
@@ -66,11 +68,16 @@ methods instead of raw backing-field writes; their behavior is not established
 by declarations. Runtime generic types, value constraints, change notifications,
 and exact reset behavior must be validated before using them.
 
-Unity Application.InvokeOnBeforeRender is also present with no managed arguments,
-making it a candidate for main-thread dispatch. Its presence does not prove that
-Endfield calls it during gameplay. Any future graphics implementation should
-first verify an actual main-thread callback, resolve each feature independently,
-capture its original value, and provide an exact reset operation.
+Unity Application.InvokeOnBeforeRender is present with no managed arguments and
+is now the graphics dispatch entry point. Its signature is validated before
+hooking; execution is logged and bound to the first callback thread. No callback
+means no graphics writes. Each parameter is resolved independently and retained
+with a GC handle while overridden. Values are captured and read back through
+typed getters; OverrideWithString and MarkFeatureDirty request updates. Reset
+restores a preexisting override, or invokes the game's Reset and MarkFeatureDirty
+methods to return control to game settings. Actual engine behavior still needs
+per-feature verification. The known-working FPS-only artifact remains available
+in build/package and the upgrade manager archives installed DLLs before replacing them.
 
 Run the inspector on the game's Endfield_Data/il2cpp_data/Metadata/global-metadata.dat:
 

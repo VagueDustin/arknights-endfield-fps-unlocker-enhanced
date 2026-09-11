@@ -113,6 +113,7 @@ EXPORT void* il2cpp_runtime_invoke(void* raw, void* object, void** arguments, vo
     *exception = nullptr;
     static thread_local int boxedInt;
     static thread_local bool boxedBool;
+    static thread_local float boxedFloat;
     if (method->kind == 3 || method->kind == 5) { boxedInt = method->kind == 3 ? vsync : aniso; return &boxedInt; }
     if (method->kind == 6) { aniso = *static_cast<int*>(arguments[0]); return nullptr; }
     if (method->kind == 7) return &pipeline;
@@ -120,6 +121,11 @@ EXPORT void* il2cpp_runtime_invoke(void* raw, void* object, void** arguments, vo
     if (method->kind == 9) return &ParameterFor(method->name);
     if (method->kind >= 10) {
         auto* parameter = static_cast<Parameter*>(object);
+        if (method->kind == 10) {
+            if (parameter->klass == &boolParam) { boxedBool = parameter->value != 0; return &boxedBool; }
+            if (parameter->klass == &intParam) { boxedInt = static_cast<int>(parameter->value); return &boxedInt; }
+            boxedFloat = static_cast<float>(parameter->value); return &boxedFloat;
+        }
         if (method->kind == 11) {
             std::wstring text = parameter->klass == &boolParam ? (parameter->value ? L"True" : L"False") : std::to_wstring(parameter->value);
             return il2cpp_string_new_utf16(text.c_str(), static_cast<int>(text.size()));
