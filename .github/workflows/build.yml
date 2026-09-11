@@ -14,7 +14,10 @@ jobs:
         with:
           python-version: '3.11'
       - name: Test compatibility and installer
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m compileall -q tools
+          if ($LASTEXITCODE -ne 0) { throw 'Python syntax validation failed' }
+          python -m unittest discover -s tests -v
       - name: Configure
         run: cmake -S . -B build -A x64
       - name: Build

@@ -146,7 +146,7 @@ class Panel(Actions):
         self.label(bottom,'',12,'text.muted',textvariable=self.status,wraplength=590).pack(side='left',padx=24,pady=16)
         self.button(bottom,'Apply live settings',lambda:self.run('configure')).pack(side='right',padx=(8,24),pady=16)
         self.button(bottom,'Install / update',lambda:self.run('install'),False).pack(side='right',pady=16)
-        self.label(window,f'Provided by VagueDustin Enterprises™ · © {datetime.date.today().year} {PRODUCT['name']}. All rights reserved.',11,'text.faint').pack(pady=10)
+        self.label(window,f"Provided by VagueDustin Enterprises™ · © {datetime.date.today().year} {PRODUCT['name']}. All rights reserved.",11,'text.faint').pack(pady=10)
         self.load_profile()
         if not self.preview and manage.state_path(Path(self.game.get())).exists():
             desktop_state.remember(Path(self.game.get()))
