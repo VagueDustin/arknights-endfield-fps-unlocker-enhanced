@@ -43,6 +43,7 @@ struct Api {
     void* (*klass)(void*, const char*, const char*);
     void* (*method)(void*, const char*, int);
     void* (*invoke)(void*, void*, void**, void**);
+    void* (*unbox)(void*);
 };
 
 bool Resolve(HMODULE module, Api& api) {
@@ -57,6 +58,7 @@ bool Resolve(HMODULE module, Api& api) {
     RESOLVE(klass, "il2cpp_class_from_name")
     RESOLVE(method, "il2cpp_class_get_method_from_name")
     RESOLVE(invoke, "il2cpp_runtime_invoke")
+    RESOLVE(unbox, "il2cpp_object_unbox")
 #undef RESOLVE
     return true;
 }
@@ -103,6 +105,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
     if (!thread) { Log("IL2CPP thread attach failed."); return 1; }
     void* fpsMethod = nullptr;
     void* vsyncMethod = nullptr;
+    void* vsyncGetter = nullptr;
     while ((!fpsMethod || !vsyncMethod) && GetTickCount64() < deadline) {
         size_t count = 0;
         void** assemblies = api.assemblies(domain, &count);
@@ -112,11 +115,14 @@ DWORD WINAPI Worker(LPVOID parameter) {
             void* app = api.klass(image, "UnityEngine", "Application");
             void* quality = api.klass(image, "UnityEngine", "QualitySettings");
             if (app) fpsMethod = api.method(app, "set_targetFrameRate", 1);
-            if (quality) vsyncMethod = api.method(quality, "set_vSyncCount", 1);
+            if (quality) {
+                vsyncMethod = api.method(quality, "set_vSyncCount", 1);
+                vsyncGetter = api.method(quality, "get_vSyncCount", 0);
+            }
         }
         if (!fpsMethod || !vsyncMethod) Sleep(250);
     }
-    if (!fpsMethod || !vsyncMethod) {
+    if (!fpsMethod || !vsyncMethod || !vsyncGetter) {
         Log("Required Unity setters unavailable; no hooks installed.");
         api.detach(thread);
         return 1;
@@ -136,6 +142,14 @@ DWORD WINAPI Worker(LPVOID parameter) {
     }
     target = configured;
     vsync = configuredVsync;
+    void* getterException = nullptr;
+    void* boxedVsync = api.invoke(vsyncGetter, nullptr, nullptr, &getterException);
+    void* unboxedVsync = boxedVsync && !getterException ? api.unbox(boxedVsync) : nullptr;
+    if (!unboxedVsync) {
+        Log("Could not read original VSync value; no hooks installed.");
+        api.detach(thread); return 1;
+    }
+    const int originalVsyncValue = *static_cast<int*>(unboxedVsync);
     MH_STATUS status = MH_Initialize();
     if (status != MH_OK) {
         Log(std::string("MinHook initialization failed: ") + MH_StatusToString(status));
@@ -176,7 +190,7 @@ DWORD WINAPI Worker(LPVOID parameter) {
             vsync = configuredVsync;
             if (effective != previousTarget || configuredVsync != previousVsync) {
                 if (!Invoke(api, fpsMethod, effective)) break;
-                if (configuredVsync >= 0 && !Invoke(api, vsyncMethod, configuredVsync)) break;
+                if (!Invoke(api, vsyncMethod, configuredVsync < 0 ? originalVsyncValue : configuredVsync)) break;
                 Log("Applied target=" + std::to_string(effective) +
                     " vsync=" + std::to_string(configuredVsync));
                 previousTarget = effective;

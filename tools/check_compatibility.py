@@ -10,7 +10,7 @@ REQUIRED_EXPORTS = (
     'il2cpp_domain_get', 'il2cpp_thread_attach', 'il2cpp_thread_detach',
     'il2cpp_domain_get_assemblies', 'il2cpp_class_from_name',
     'il2cpp_class_get_method_from_name', 'il2cpp_runtime_invoke',
-    'il2cpp_assembly_get_image',
+    'il2cpp_assembly_get_image', 'il2cpp_object_unbox',
 )
 
 

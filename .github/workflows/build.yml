@@ -19,6 +19,8 @@ jobs:
         run: cmake -S . -B build -A x64
       - name: Build
         run: cmake --build build --config Release
+      - name: Test native loader and runtime
+        run: ctest --test-dir build -C Release --output-on-failure
       - name: Package
         run: |
           cmake --install build --config Release --prefix build/package
