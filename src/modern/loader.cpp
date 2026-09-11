@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <string>
+#include "compiler_exports.h"
 
 static DWORD WINAPI Start(LPVOID parameter) {
     wchar_t path[32768];

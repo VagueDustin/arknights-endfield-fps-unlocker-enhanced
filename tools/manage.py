@@ -5,6 +5,7 @@ import ctypes
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 import uuid
@@ -19,6 +20,10 @@ PAYLOAD = 'endfield_fps.dll'
 CONFIG = 'endfield-enhancer.ini'
 OWNED = (COMPILER, ORIGINAL, PAYLOAD, CONFIG)
 PRESETS = {'balanced': 120, 'high-refresh': 144, '240hz': 240, 'unlimited': -1}
+
+
+def package_directory():
+    return Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 
 
 def digest(path):
@@ -255,7 +260,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics'])
     parser.add_argument('--game', type=Path)
-    parser.add_argument('--package', type=Path, default=Path(__file__).resolve().parent)
+    parser.add_argument('--package', type=Path, default=package_directory())
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--preset', choices=PRESETS)
     group.add_argument('--fps', type=int)

@@ -25,6 +25,12 @@ jobs:
         run: |
           cmake --install build --config Release --prefix build/package
           python tools/package_build.py build/package
+      - name: Build standalone manager
+        run: |
+          python -m pip install pyinstaller==6.16.0
+          python -m PyInstaller --noconfirm --clean --onefile --name EndfieldManager --distpath build/package tools/manage.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name EndfieldEnhancer --distpath build/package tools/desktop.py
+          build/package/EndfieldManager.exe profiles
       - uses: actions/upload-artifact@v4
         with:
           name: EndfieldEnhancer-windows-x64-experimental
