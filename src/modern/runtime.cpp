@@ -7,6 +7,10 @@
 #include <string>
 #include <mutex>
 
+#ifndef FATE_ENGINE_VERSION
+#define FATE_ENGINE_VERSION "dev"
+#endif
+
 namespace {
 std::wstring configPath;
 std::filesystem::path logPath;
@@ -31,6 +35,16 @@ void Log(const std::string& message) {
     file << time.wYear << '-' << time.wMonth << '-' << time.wDay << ' '
          << time.wHour << ':' << time.wMinute << ':' << time.wSecond
          << " " << message << '\n';
+}
+
+std::string Narrow(const std::wstring& text) {
+    if (text.empty()) return {};
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
+        nullptr, 0, nullptr, nullptr);
+    std::string result(size > 0 ? static_cast<size_t>(size) : 0, '\0');
+    if (size > 0) WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
+        result.data(), size, nullptr, nullptr);
+    return result;
 }
 
 int Read(const wchar_t* name, int fallback) {
@@ -101,7 +115,8 @@ DWORD WINAPI Worker(LPVOID parameter) {
     std::error_code error;
     std::filesystem::create_directories(logDirectory, error);
     logPath = logDirectory / (L"runtime-" + std::to_wstring(GetCurrentProcessId()) + L".log");
-    Log("Starting runtime 0.3.2. Graphics controls are opt-in.");
+    Log(std::string("Starting Fate Engine runtime ") + FATE_ENGINE_VERSION + ". Graphics controls are opt-in.");
+    Log("Loaded from " + Narrow(directory.wstring()) + "; configuration " + Narrow(configPath));
     if (!std::filesystem::is_regular_file(configPath, error)) {
         Log("Configuration missing; no overrides installed.");
         return 1;

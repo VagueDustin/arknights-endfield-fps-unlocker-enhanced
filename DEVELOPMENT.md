@@ -93,6 +93,16 @@ python tools/inspect_graphics_metadata.py 'C:\path\to\global-metadata.dat' --typ
 Raw inspection results remain in ignored local-reports. Do not commit or upload
 the game's metadata or runtime binaries.
 
+## Versioning and releases
+
+`assets/identity/product.json` is the single version source: CMake reads it for the
+project version and the runtime's `FATE_ENGINE_VERSION` log line, the packaging tools
+write it into `package.json` and the executable resources, and the installer reads the
+generated `build/brand/product.iss`. `tests/test_product_metadata.py` fails when a
+version is hardcoded elsewhere. Follow [docs/RELEASE.md](docs/RELEASE.md) to build a
+release; the shipped runtime must come from CI or a fresh CMake install of the tagged
+source, never from an older local package folder.
+
 ## Desktop development
 
 Install customtkinter==5.2.2 and Pillow, then run `python tools/desktop.py`.

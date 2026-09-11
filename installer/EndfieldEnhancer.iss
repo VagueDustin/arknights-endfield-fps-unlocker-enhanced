@@ -2,9 +2,13 @@
 #ifndef PackageDir
   #define PackageDir "..\build\package"
 #endif
+; Build variants:
+;   (default)          unbundled app: FPS unlocker plus DLSS page that asks for user-supplied components
+;   /DBundledReShade   release bundle: adds the ReShade setup and tested neural components from PackageDir
+;   /DValidationBuild  isolated AppId and output name for installer self-tests
 [Setup]
 #ifdef ValidationBuild
-AppId=FateEngine-NativeNR-IsolatedValidation
+AppId=FateEngine-IsolatedValidation
 #else
 AppId={{2F62B8B6-FA09-4D41-9871-3F5A92171C32}
 #endif
@@ -29,14 +33,10 @@ OutputBaseFilename=Fate-Engine-ReShade-Validation
 OutputBaseFilename=Fate-Engine-Arknights-Endfield-Setup-{#ProductVersion}
 #endif
 #else
-#ifdef PrivateNativeNR
 #ifdef ValidationBuild
-OutputBaseFilename=Fate-Engine-Native-NR-Validation
+OutputBaseFilename=Fate-Engine-Unbundled-Validation
 #else
-OutputBaseFilename=Fate-Engine-Native-NR-Private-Setup-{#ProductVersion}
-#endif
-#else
-OutputBaseFilename=Fate-Engine-Arknights-Endfield-Setup-{#ProductVersion}
+OutputBaseFilename=Fate-Engine-Arknights-Endfield-Setup-{#ProductVersion}-unbundled
 #endif
 #endif
 Compression=lzma2
@@ -59,9 +59,6 @@ Source: "{#PackageDir}\neural-components\*"; DestDir: "{app}\neural-components";
 Source: "{#PackageDir}\reshade-payload.json"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 Source: "..\docs\DLSS-RESHade-SETUP.md"; DestDir: "{app}"; Flags: ignoreversion
-#ifdef PrivateNativeNR
-Source: "{#PackageDir}\native-nr\*"; DestDir: "{app}\native-nr"; Flags: ignoreversion recursesubdirs createallsubdirs
-#endif
 Source: "{#PackageDir}\{#ProductExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\EndfieldManager.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
