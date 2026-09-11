@@ -11,7 +11,9 @@ import native_neural
 class NativeInstallTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
-        self.root=Path(self.temp.name);self.game=self.root/'game';self.source=self.root/'source'
+        # GitHub's Windows runner may use a short-name TEMP path. Match the
+        # production path normalization before assigning mock runtime versions.
+        self.root=Path(self.temp.name).resolve();self.game=self.root/'game';self.source=self.root/'source'
         self.game.mkdir();self.source.mkdir();(self.game/'Endfield.exe').write_bytes(b'game')
         hashes={}
         for name in native_neural.FILES:
