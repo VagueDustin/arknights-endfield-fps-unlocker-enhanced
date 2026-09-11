@@ -21,7 +21,7 @@ class DesktopStateTests(unittest.TestCase):
             with patch('manage.locked') as locked, patch('manage.restore', side_effect=ValueError('changed file')):
                 with self.assertRaisesRegex(ValueError, 'changed file'):
                     desktop_state.restore_recorded()
-                locked.assert_called_once_with(game)
+                locked.assert_called_once_with(game.resolve())
 
     def test_live_status_ignores_logs_from_another_process(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, LOCALAPPDATA=directory):
