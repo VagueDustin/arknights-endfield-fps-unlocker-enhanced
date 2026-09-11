@@ -1,6 +1,6 @@
 # Fate Engine - Arknights Endfield FPS Unlocker
 
-[Download Fate Engine 0.4.4 for Windows](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases/tag/v0.4.4) - experimental prerelease. Includes the tested ReShade setup and DLSS 5 components. [Installation and in-game controls](docs/DLSS-RESHade-SETUP.md).
+[Download Fate Engine 0.4.4 for Windows](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases/tag/v0.4.4) - stable release. Includes the tested ReShade setup and DLSS 5 components. [Installation and in-game controls](docs/DLSS-RESHade-SETUP.md).
 
 ### [View interactive DLSS 5 comparisons](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
 
@@ -10,7 +10,7 @@ A standalone Windows desktop application by **VagueDustin Enterprises** for live
 The native implementation lives in `src/modern`. See [third-party notices](THIRD_PARTY_NOTICES.md) for project origins and dependency attribution.
 An initial gameplay test on September 11, 2026 was reported working by the user;
 runtime logs also confirm foreground/background target changes. Extended stability
-and other rendering modes remain unverified. This is still an experimental build.
+and other rendering modes remain unverified. Graphics tuning remains experimental.
 
 ![Fate Engine desktop app](docs/desktop.png)
 
