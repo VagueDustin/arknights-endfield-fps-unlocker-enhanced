@@ -1,4 +1,3 @@
-import hashlib
 import json
 from pathlib import Path
 import sys
@@ -30,7 +29,7 @@ class ManagerTests(unittest.TestCase):
             ('game_idle', lambda: None),
             ('inspect', lambda _: {'missing_required_exports': [],
                 'runtime_sha256': 'test', 'legacy_loader_files_present': []}),
-            ('pe_exports', lambda _: ['test_export']),
+            ('pe_exports', lambda _, **kwargs: [('test_export', 1)]),
         ]:
             mock = patch.object(manage, name, replacement)
             mock.start()
@@ -96,7 +95,7 @@ class ManagerTests(unittest.TestCase):
         self.assertFalse((self.game / manage.STATE).exists())
 
     def test_export_mismatch_prevents_install(self):
-        with patch.object(manage, 'pe_exports', lambda p: [p.parent.name]):
+        with patch.object(manage, 'pe_exports', lambda p, **kwargs: [p.parent.name]):
             with self.assertRaisesRegex(ValueError, 'export mismatch'):
                 self.install()
         self.assertFalse((self.game / manage.STATE).exists())

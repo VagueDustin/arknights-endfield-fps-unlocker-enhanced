@@ -14,7 +14,7 @@ REQUIRED_EXPORTS = (
 )
 
 
-def pe_exports(path):
+def pe_exports(path, details=False):
     with path.open('rb') as stream, mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as data:
         def read(fmt, offset):
             return struct.unpack_from(fmt, data, offset)
@@ -48,8 +48,10 @@ def pe_exports(path):
         if not export_rva:
             return []
         directory = offset(export_rva)
+        base, = read('<I', directory + 16)
         name_count, = read('<I', directory + 24)
         names_rva, = read('<I', directory + 32)
+        ordinals_rva, = read('<I', directory + 36)
         if name_count > len(data) // 4:
             raise ValueError('Invalid export count')
         names = offset(names_rva) if name_count else 0
@@ -60,7 +62,12 @@ def pe_exports(path):
             end = data.find(b'\0', start, min(start + 4096, len(data)))
             if end == -1:
                 raise ValueError('Unterminated export name')
-            result.append(data[start:end].decode('ascii'))
+            name = data[start:end].decode('ascii')
+            if details:
+                ordinal_index, = read('<H', offset(ordinals_rva) + index * 2)
+                result.append((name, base + ordinal_index))
+            else:
+                result.append(name)
         return result
 
 

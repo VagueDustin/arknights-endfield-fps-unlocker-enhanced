@@ -28,6 +28,9 @@ class ExportTests(unittest.TestCase):
         struct.pack_into('<IIII', data, 0x98 + 240 + 8, 512, 0x1000, 512, 512)
         struct.pack_into('<I', data, 512 + 24, 1)
         struct.pack_into('<I', data, 512 + 32, 0x1040)
+        struct.pack_into('<I', data, 512 + 16, 7)
+        struct.pack_into('<I', data, 512 + 36, 0x1048)
+        struct.pack_into('<H', data, 584, 2)
         struct.pack_into('<I', data, 576, 0x1050)
         name = b'il2cpp_domain_get\0'
         data[592:592 + len(name)] = name
@@ -35,6 +38,12 @@ class ExportTests(unittest.TestCase):
 
     def test_reads_export_table(self):
         self.assertEqual(self.parse(self.fixture()), ['il2cpp_domain_get'])
+
+    def test_preserves_export_ordinals(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'fixture.dll'
+            path.write_bytes(self.fixture())
+            self.assertEqual(compat.pe_exports(path, details=True), [('il2cpp_domain_get', 9)])
 
     def test_rejects_unmapped_name(self):
         data = self.fixture()

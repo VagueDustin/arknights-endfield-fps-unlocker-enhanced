@@ -156,7 +156,7 @@ def install(game, package, config):
         if digest(package / name) != expected:
             raise ValueError(f'Package checksum mismatch: {name}')
     # Forward only to the compiler supplied by this game, preserving all named exports.
-    if set(pe_exports(game / COMPILER)) != set(pe_exports(package / COMPILER)):
+    if set(pe_exports(game / COMPILER, details=True)) != set(pe_exports(package / COMPILER, details=True)):
         raise ValueError('Compiler export mismatch; this loader does not match the installed compiler')
     original = (game / COMPILER).read_bytes()
     files = {COMPILER: (package / COMPILER).read_bytes(), ORIGINAL: original,
@@ -231,9 +231,29 @@ def configure(game, target=None, background=None, vsync=None):
     return {'status': 'configured', 'note': 'Runtime reloads within one second. Graphics overrides remain disabled.'}
 
 
+def diagnostics(game):
+    result = inspect(game)
+    state = state_path(game)
+    if state.exists():
+        _, manifest = read_state(game)
+        result['installation_phase'] = manifest['phase']
+        result['runtime_changed_since_install'] = result['runtime_sha256'] != manifest['runtime_sha256']
+        result['changed_or_missing_files'] = [name for name, expected in manifest['installed'].items()
+            if name != CONFIG and (not (game / name).is_file() or digest(game / name) != expected)]
+    else:
+        result['installation_phase'] = 'not_installed'
+    local = os.environ.get('LOCALAPPDATA')
+    logs = sorted((Path(local) / 'EndfieldEnhancer').glob('runtime-*.log'),
+                  key=lambda path: path.stat().st_mtime, reverse=True) if local else []
+    result['latest_runtime_log'] = logs[0].name if logs else None
+    result['latest_runtime_log_tail'] = logs[0].read_text(errors='replace').splitlines()[-30:] if logs else []
+    result['log_note'] = 'Logs may belong to an earlier launch or the test harness; check timestamps.'
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles'])
+    parser.add_argument('command', choices=['inspect', 'install', 'restore', 'configure', 'profiles', 'diagnostics'])
     parser.add_argument('--game', type=Path)
     parser.add_argument('--package', type=Path, default=Path(__file__).resolve().parent)
     group = parser.add_mutually_exclusive_group()
@@ -263,6 +283,8 @@ def main():
                     0 if args.vsync is None else args.vsync))
             elif args.command == 'configure':
                 result = configure(game, fps, args.background, args.vsync)
+            elif args.command == 'diagnostics':
+                result = diagnostics(game)
             else:
                 result = restore(game)
         print(json.dumps(result, indent=2))

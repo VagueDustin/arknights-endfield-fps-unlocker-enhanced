@@ -73,6 +73,9 @@ bool Invoke(Api& api, void* method, int value) {
 
 DWORD WINAPI Worker(LPVOID parameter) {
     wchar_t path[32768];
+    DWORD processLength = GetModuleFileNameW(nullptr, path, 32768);
+    if (!processLength || processLength >= 32768 ||
+        _wcsicmp(std::filesystem::path(path).filename().c_str(), L"Endfield.exe") != 0) return 0;
     const DWORD length = GetModuleFileNameW(static_cast<HMODULE>(parameter), path, 32768);
     if (!length || length >= 32768) return 1;
     const auto directory = std::filesystem::path(std::wstring(path, length)).parent_path();
