@@ -157,7 +157,7 @@ EXPORT void* il2cpp_class_get_parent(void*) { return nullptr; }
 EXPORT const char* il2cpp_class_get_name(void* klass) { return static_cast<Class*>(klass)->name; }
 EXPORT const char* il2cpp_class_get_namespace(void* klass) { return static_cast<Class*>(klass)->space; }
 EXPORT const void* il2cpp_method_get_return_type(void* method) { return &static_cast<Method*>(method)->returnType; }
-EXPORT const void* il2cpp_method_get_param(void* method, unsigned index) { static int types[] = {0x12, 0x18, 0x1c}; if (method == &frame) return &types[index]; return &static_cast<Method*>(method)->parameterType; }
+EXPORT const void* il2cpp_method_get_param(void* method, unsigned index) { static int types[] = {0x12, 0x18, 0x12}; if (method == &frame) return &types[index]; return &static_cast<Method*>(method)->parameterType; }
 EXPORT unsigned il2cpp_method_get_param_count(void* method) { if (method == &frame) return 3; return static_cast<Method*>(method)->parameterType < 0 ? 0 : 1; }
 EXPORT unsigned il2cpp_method_get_flags(void* method, unsigned* ignored) { *ignored = 0; return static_cast<Method*>(method)->isStatic ? 0x10 : 0; }
 EXPORT int il2cpp_type_get_type(const void* type) { return *static_cast<const int*>(type); }

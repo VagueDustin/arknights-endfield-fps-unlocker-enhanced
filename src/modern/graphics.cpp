@@ -374,8 +374,14 @@ bool Initialize(HMODULE module, bool knownRuntime, Logger logger) {
     // Do not guess the ABI when the game changes this entry point.
     if (!frame || api.paramCount(frame) != 3 || api.type(api.returnType(frame)) != 0x01 ||
         !(api.flags(frame, &ignoredFlags) & 0x10) || api.type(api.paramType(frame, 0)) != 0x12 ||
-        api.type(api.paramType(frame, 1)) != 0x18 || api.type(api.paramType(frame, 2)) != 0x1c ||
+        api.type(api.paramType(frame, 1)) != 0x18 || api.type(api.paramType(frame, 2)) != 0x12 ||
         !*static_cast<void**>(frame)) {
+        if (frame) {
+            std::string types;
+            for (unsigned index = 0; index < api.paramCount(frame); ++index)
+                types += " " + std::to_string(api.type(api.paramType(frame, index)));
+            Log("render-loop signature types:" + types);
+        }
         Log("render-loop entry point unavailable; graphics disabled"); return false;
     }
     pipelineGetter = Method(Class("UnityEngine.Rendering", "RenderPipelineManager"), "get_currentPipeline", 0);
