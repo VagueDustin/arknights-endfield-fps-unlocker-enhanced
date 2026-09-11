@@ -38,7 +38,7 @@ files were present. The runtime SHA-256 was
    extended gameplay, other renderers, and real-game restore.
 4. Implemented: desktop/CLI managers, presets, live configuration, VSync control,
    background cap, and Epic folder discovery. Python is bundled in standalone EXEs.
-5. Version 0.3.0 implements opt-in graphics controls via a before-render callback,
+5. Version 0.3.1 implements opt-in graphics controls via a render-loop callback,
    with an exact runtime hash gate, typed APIs, readback, per-feature failure
    isolation, and reset. The legacy graphics DLL remains excluded. Native fake
    runtime tests pass; actual game callback and feature effects still need testing.

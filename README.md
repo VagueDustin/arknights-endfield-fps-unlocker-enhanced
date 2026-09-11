@@ -6,6 +6,8 @@ An initial gameplay test on September 11, 2026 was reported working by the user;
 runtime logs also confirm foreground/background target changes. Extended stability
 and other rendering modes remain unverified. This is still an experimental build.
 
+![Endfield Enhancer desktop app](docs/desktop.png)
+
 ## Features
 
 - 120, 144, 240, and unlimited presets; custom targets from 30–1000 FPS.
@@ -131,7 +133,7 @@ MIT license. Original copyright and attribution are preserved in LICENSE.
 
 ## Windows app and installer
 
-Download the setup executable from this repository's releases, or the `EndfieldEnhancer-setup` Actions artifact while a release is in testing. Setup installs the desktop app under your user profile and adds a Start menu shortcut. Open the app, select the game folder, and choose **Install / update** with the game closed.
+Download the setup executable from [Releases](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases), or the `EndfieldEnhancer-setup` Actions artifact while a release is in testing. Setup installs the desktop app under your user profile and adds a Start menu shortcut. Open the app, select the game folder, and choose **Install / update** with the game closed.
 
 Use **Apply live settings** during gameplay. The header reports the running process and the last cap acknowledged by its runtime log; it does not measure actual FPS. Graphics controls remain experimental and report availability in the runtime log.
 
