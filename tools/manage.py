@@ -163,7 +163,7 @@ def read_state(game):
     return state, manifest
 
 
-def install(game, package, config):
+def install(game, package, config, previous_archive=None):
     game_idle()
     report = inspect(game)
     if report['missing_required_exports']:
@@ -194,6 +194,8 @@ def install(game, package, config):
                 'original_sha256': hashlib.sha256(original).hexdigest(),
                 'runtime_sha256': report['runtime_sha256'],
                 'installed': {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}}
+    if previous_archive is not None:
+        manifest['previous_archive'] = previous_archive
     state.mkdir()
     try:
         atomic_write(state / 'original.bin', original)
@@ -295,14 +297,15 @@ def upgrade(game, package, config=None):
     restored = restore(game)
     archived = game / restored['backup_directory']
     try:
-        result = install(game, package, old_config if config is None else config)
+        result = install(game, package, old_config if config is None else config, previous_archive=archived.name)
     except Exception as error:
-        if not state_path(game).exists():
+        if state_path(game).exists():
+            raise RuntimeError(f'Upgrade failed; recovery state remains. Previous build is in {archived.name}: {error}') from error
+        try:
             install(game, archived / 'previous-package', old_config)
-        raise RuntimeError(f'Upgrade failed; previous build restored when possible: {error}') from error
-    new_state, new_manifest = read_state(game)
-    new_manifest['previous_archive'] = archived.name
-    atomic_write(new_state / 'manifest.json', json.dumps(new_manifest, indent=2).encode())
+        except Exception as rollback_error:
+            raise RuntimeError(f'Upgrade and rollback failed. Preserve {archived.name}: {rollback_error}') from error
+        raise RuntimeError(f'Upgrade failed; previous build restored: {error}') from error
     result['previous_build_backup'] = archived.name
     return result
 

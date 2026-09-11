@@ -244,7 +244,10 @@ void Apply(Feature& feature, void* settings, const std::wstring& desired) {
         Status(feature, "readback mismatch; original restored when possible"); return;
     }
     feature.applied = desired;
-    Status(feature, "applied; readback=" + std::string(actual.begin(), actual.end()));
+    std::string printable;
+    for (wchar_t character : actual)
+        printable.push_back(character >= 32 && character <= 126 ? static_cast<char>(character) : '?');
+    Status(feature, "applied; readback=" + printable);
 }
 void Anisotropic(int desired) {
     if (!anisoGetter || !anisoSetter || (desired == -1 && originalAniso == -1)) return;

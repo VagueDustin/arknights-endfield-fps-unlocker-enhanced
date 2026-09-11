@@ -128,6 +128,65 @@ class ManagerTests(unittest.TestCase):
                 self.install()
         self.assertFalse((self.game / manage.STATE).exists())
 
+    def newer_package(self):
+        for name in (manage.COMPILER, manage.PAYLOAD):
+            (self.package / name).write_bytes(('version two ' + name).encode())
+        (self.package / 'package.json').write_text(json.dumps({'files': {
+            name: manage.digest(self.package / name) for name in (manage.COMPILER, manage.PAYLOAD)}}))
+
+    def test_upgrade_and_previous_build_restore(self):
+        self.install()
+        manage.configure(self.game, target=240, graphics={'Sharpening': 20})
+        original_config = (self.game / manage.CONFIG).read_bytes()
+        self.newer_package()
+        manage.upgrade(self.game, self.package)
+        self.assertEqual((self.game / manage.PAYLOAD).read_bytes(), b'version two endfield_fps.dll')
+        self.assertEqual((self.game / manage.CONFIG).read_bytes(), original_config)
+        manage.rollback(self.game)
+        self.assertEqual((self.game / manage.PAYLOAD).read_bytes(), b'new runtime')
+        self.assertEqual((self.game / manage.CONFIG).read_bytes(), original_config)
+        self.assertEqual((self.game / manage.ORIGINAL).read_bytes(), self.original)
+
+    def test_failed_upgrade_restores_previous_build(self):
+        self.install()
+        self.newer_package()
+        original_install = manage.install
+        failed = False
+        def fail_once(*args, **kwargs):
+            nonlocal failed
+            if not failed:
+                failed = True
+                raise OSError('simulated new package failure')
+            return original_install(*args, **kwargs)
+        with patch.object(manage, 'install', fail_once):
+            with self.assertRaisesRegex(RuntimeError, 'previous build restored'):
+                manage.upgrade(self.game, self.package)
+        self.assertEqual((self.game / manage.PAYLOAD).read_bytes(), b'new runtime')
+        self.assertTrue((self.game / manage.STATE / 'manifest.json').is_file())
+
+    def test_upgrade_tamper_preserves_installed_files(self):
+        self.install()
+        (self.package / manage.PAYLOAD).write_bytes(b'bad')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            manage.upgrade(self.game, self.package)
+        self.assertEqual((self.game / manage.PAYLOAD).read_bytes(), b'new runtime')
+
+    def test_fps_changes_preserve_graphics_and_reset_is_independent(self):
+        self.install()
+        manage.configure(self.game, graphics=manage.GRAPHICS_PRESETS['crisp'])
+        manage.configure(self.game, target=240)
+        self.assertIn(b'Sharpening=20', (self.game / manage.CONFIG).read_bytes())
+        manage.configure(self.game, graphics=manage.GRAPHICS_DEFAULTS)
+        self.assertIn(b'Target=240', (self.game / manage.CONFIG).read_bytes())
+        self.assertIn(b'Sharpening=-1', (self.game / manage.CONFIG).read_bytes())
+
+    def test_graphics_validation(self):
+        for graphics in ({'Sharpening': 101}, {'RenderScale': 0}, {'ShadowResolution': 9000},
+                         {'Anisotropic': 16}, {'AmbientOcclusion': 2}, {'TemporalAA': 2},
+                         {'unknown': 1}, {'Sharpening': float('nan')}):
+            with self.subTest(graphics=graphics), self.assertRaises(ValueError):
+                manage.settings(graphics=graphics)
+
 
 if __name__ == '__main__':
     unittest.main()
