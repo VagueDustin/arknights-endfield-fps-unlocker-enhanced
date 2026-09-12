@@ -114,6 +114,24 @@ def player_log_path():
     return Path(local).parent / 'LocalLow' / 'Gryphline' / 'Endfield' / 'Player.log' if local else None
 
 
+def last_launch_folder(path=None):
+    """The game folder Endfield last actually started from, per Unity's Player.log.
+
+    Two installations can share one Player.log, so this is the only local record of
+    which one the player really launches.
+    """
+    path = player_log_path() if path is None else Path(path)
+    try:
+        if path is None or not path.is_file():
+            return None
+        with path.open('rb') as stream:
+            head = stream.read(262144).decode('utf-8', errors='replace')
+    except OSError:
+        return None
+    match = re.search(r'Discovering subsystems at path\s+(.+?)[/\\]Endfield_Data[/\\]UnitySubsystems', head)
+    return Path(match[1].strip().replace('/', os.sep)) if match else None
+
+
 def graphics_api(path=None):
     """Name the renderer Endfield used in its most recent launch, from Unity's Player.log."""
     path = player_log_path() if path is None else Path(path)

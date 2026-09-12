@@ -55,6 +55,32 @@ class DesktopStateTests(unittest.TestCase):
                 run.return_value.stdout='"Endfield.exe","790","Console","1","1 K"'
                 self.assertEqual(live_status.snapshot(now=1000)['runtime'],'starting')
 
+    def test_snapshot_reports_when_another_installation_is_running(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, LOCALAPPDATA=directory):
+            (Path(directory) / 'EndfieldEnhancer').mkdir()
+            managed = Path(directory) / 'Epic' / 'EndField Game'
+            playing = Path(directory) / 'GRYPHLINK' / 'Arknights Endfield'
+            with patch('live_status._run') as run, \
+                 patch('live_status.process_path', lambda pid: str(playing / 'Endfield.exe')), \
+                 patch('live_status.anticheat_state', lambda: 'running'):
+                run.return_value.stdout = '"Endfield.exe","321","Console","1","1 K"'
+                other = live_status.snapshot(now=0, game=str(managed))
+                self.assertIs(other['install_match'], False)
+                self.assertEqual(other['image_path'], str(playing / 'Endfield.exe'))
+                same = live_status.snapshot(now=0, game=str(playing))
+                self.assertIs(same['install_match'], True)
+                # Without a known folder the app must not claim a mismatch.
+                self.assertIsNone(live_status.snapshot(now=0)['install_match'])
+
+    def test_session_record_keeps_the_running_image_path(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, LOCALAPPDATA=directory):
+            record = live_status.record_session({'running': True, 'pid': 5, 'runtime': 'missing',
+                                                 'anticheat': 'running', 'runtime_seconds': 60, 'cap': None,
+                                                 'image_path': r'C:\GRYPHLINK\Arknights Endfield\Endfield.exe',
+                                                 'install_match': False})
+            self.assertIs(record['install_match'], False)
+            self.assertIn('GRYPHLINK', record['image_path'])
+
     def test_session_record_accumulates_states_per_game_process(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, LOCALAPPDATA=directory):
             self.assertIsNone(live_status.record_session({'running': False}))

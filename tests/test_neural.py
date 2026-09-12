@@ -84,6 +84,18 @@ class NeuralTests(unittest.TestCase):
         self.assertIn('Unknown', self.original_graphics_api(log))
         self.assertIn('Unknown', self.original_graphics_api(self.game / 'absent.log'))
 
+    def test_last_launch_folder_is_read_from_the_unity_log(self):
+        log = self.game / 'Player.log'
+        log.write_text('[Physics::Module] Initialized MultithreadedJobDispatcher with {0} workers.\n'
+                       'Initialize engine version: 2021.3.34f5 (0)\n'
+                       '[Subsystems] Discovering subsystems at path C:/Program Files/GRYPHLINK/games/'
+                       'Arknights Endfield/Endfield_Data/UnitySubsystems\n')
+        self.assertEqual(neural.last_launch_folder(log),
+                         Path(r'C:\Program Files\GRYPHLINK\games\Arknights Endfield'))
+        log.write_text('Initialize engine version: 2021.3.34f5 (0)\n')
+        self.assertIsNone(neural.last_launch_folder(log))
+        self.assertIsNone(neural.last_launch_folder(self.game / 'absent.log'))
+
     def test_summary_explains_reshade_and_renderer_evidence(self):
         (self.game / 'ReShade.log').write_text(
             "12:00:00:000 [1] | INFO  | Initializing crosire's ReShade version '6.8.0.2155' (64-bit) ...\n"

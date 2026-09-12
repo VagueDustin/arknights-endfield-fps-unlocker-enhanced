@@ -347,16 +347,26 @@ def diagnostics(game):
         result['package_version'] = None
     import neural
     import live_status
+    import installs
     result['last_launch_graphics_api'] = neural.graphics_api()
     result['last_launch_gpu'] = neural.gpu_name()
+    # A PC with two Endfield installations is the one failure that looks exactly like
+    # a broken install: every file is correct and the game never loads any of them.
+    last_folder = neural.last_launch_folder()
+    result['last_launch_game_folder'] = str(last_folder) if last_folder else None
+    result['managed_folder_is_the_one_played'] = installs.same_folder(game, last_folder)
+    result['installations_found'] = [{'source': source, 'folder': folder,
+                                      'managed': installs.same_folder(game, folder)}
+                                     for source, folder in installs.find_games()]
     result['anticheat_service_now'] = live_status.anticheat_state()
     try:
         result['last_session'] = json.loads(live_status.session_path().read_text(encoding='utf-8'))
     except (OSError, ValueError):
         result['last_session'] = None
     result['runtime_loader_note'] = ('The runtime starts when Endfield loads d3dcompiler_47.dll from the game folder. '
-                                     'A session that never reports a runtime either never loaded that library or had '
-                                     'the load blocked (anti-cheat or antivirus); see last_session.')
+                                     'A session that never reports a runtime either ran a different installation '
+                                     '(check installations_found), never loaded that library, or had the load blocked '
+                                     'by anti-cheat or antivirus; see last_session.')
     try:
         result['dlss'] = neural.inspect(game)
     except (OSError, ValueError) as error:

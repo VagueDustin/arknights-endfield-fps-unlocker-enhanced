@@ -11,22 +11,9 @@ from tkinter import filedialog, messagebox, ttk
 
 import manage
 import desktop_state
-
-
-def find_game():
-    manifests = Path(os.environ.get('PROGRAMDATA', 'C:/ProgramData')) / 'Epic/EpicGamesLauncher/Data/Manifests'
-    for path in manifests.glob('*.item'):
-        try:
-            data = json.loads(path.read_text(encoding='utf-8-sig'))
-            if 'endfield' not in data.get('DisplayName', '').lower():
-                continue
-            root = Path(data['InstallLocation'])
-            for candidate in (root, root / 'games/EndField Game'):
-                if (candidate / 'Endfield.exe').is_file():
-                    return str(candidate)
-        except (OSError, ValueError, KeyError):
-            continue
-    return ''
+# Installation discovery lives in its own module so the console manager never
+# pulls in tkinter. Re-exported here because the desktop panel imports it.
+from installs import find_game, find_games  # noqa: F401
 
 
 def permission_message(error):

@@ -63,8 +63,11 @@ class Panel(Actions):
         self.closed = threading.Event()
         self.buttons = []
         self.runtime_warned = False
+        self.mismatch_warned = False
         self.status = tk.StringVar(value='Local design preview - game files are unchanged.' if self.preview else 'Ready. Apply settings while the game is running.')
         self.game = tk.StringVar(value=desktop_state.selected() or find_game())
+        # A plain copy for the status thread; Tk variables are not thread-safe.
+        self.game_folder = self.game.get()
         self.fps = tk.StringVar(value='144')
         self.background = tk.StringVar(value='30')
         self.vsync = tk.StringVar(value='Off')
@@ -188,6 +191,7 @@ class Panel(Actions):
         self.load_profile()
         if not self.preview and manage.state_path(Path(self.game.get())).exists():
             desktop_state.remember(Path(self.game.get()))
+        self.check_installations()
         window.after(100,self.poll)
         window.after(500,lambda:self.neural_action('inspect') if not self.busy else None)
         threading.Thread(target=self.watch,daemon=True).start()
@@ -296,11 +300,40 @@ class Panel(Actions):
     def watch(self):
         while not self.closed.is_set():
             try:
-                data=live_status.snapshot()
+                data=live_status.snapshot(game=self.game_folder)
                 self.live_events.put(data)
                 if data.get('running') and not self.preview:live_status.record_session(data)
             except Exception as error: self.live_events.put({'error':str(error)})
             self.closed.wait(2)
+    def check_installations(self):
+        """A second Endfield install is the one failure that mimics a broken setup.
+
+        Every managed file is correct and the game simply never loads any of them,
+        so say plainly which installation is actually being played.
+        """
+        try:
+            import installs
+            selected=self.game.get()
+            played=installs.last_launched()
+            found=installs.find_games()
+        except Exception:
+            return
+        if installs.same_folder(selected,played) is False:
+            message=('Endfield last ran from:\n'+str(played)+'\n\nbut this app is managing:\n'+selected+
+                     '\n\nSettings applied here cannot reach the game you are playing. '
+                     'Use Game folder… to select the installation you actually launch.')
+            self.status.set('Endfield last ran from a different folder than the one managed here. Use Game folder… to select '+str(played))
+            if not self.preview:messagebox.showwarning('Different Endfield installation',message)
+        elif len(found)>1:
+            self.status.set(f'{len(found)} Endfield installations found. Managing {selected}. Use Game folder… to switch.')
+    def browse(self):
+        """Start the picker at the installation the game actually runs, when that is known."""
+        import installs
+        start=str(installs.last_launched() or self.game.get() or '')
+        selected=filedialog.askdirectory(title='Select Endfield game folder',initialdir=start) if start else filedialog.askdirectory(title='Select Endfield game folder')
+        if selected:
+            self.game.set(selected);self.game_folder=selected
+            self.load_profile();self.check_installations()
     FPS_MESSAGES={
         'install':('FPS unlocker installed. Launch Endfield; the header reports the applied cap once the runtime starts.','FPS unlocker setup stopped.'),
         'configure':('Game settings saved. A running game picks them up within about a second.','Game settings were not saved.'),
@@ -316,6 +349,7 @@ class Panel(Actions):
         except Exception as error:self.report_failure(error)
         self.window.after(150,self.poll)
     def process_events(self):
+        self.game_folder=self.game.get()
         try:
             event=self.events.get_nowait();success,result=event[:2];self.busy=False
             for button in self.buttons:button.configure(state='normal')
@@ -339,7 +373,14 @@ class Panel(Actions):
                 self.game_running=running
                 cap=data['cap'];self.cap_badge.configure(text='Applied cap -' if cap is None else ('Uncapped' if cap==-1 else f'{cap} FPS applied cap'))
                 runtime=data.get('runtime','idle')
-                if runtime=='missing':
+                if data.get('install_match') is False:
+                    # Nothing installed here can reach a different copy of the game.
+                    self.callback_badge.configure(text='Different install running',text_color=color('status.warning'))
+                    if not self.mismatch_warned:
+                        self.mismatch_warned=True
+                        self.status.set('The running game is a different installation: '+os.path.dirname(data.get('image_path') or '')+
+                                        '. Use Game folder… to select it, then set up the FPS unlocker there.')
+                elif runtime=='missing':
                     self.callback_badge.configure(text='Runtime not detected',text_color=color('status.warning'))
                     if not self.runtime_warned:
                         self.runtime_warned=True
@@ -348,7 +389,7 @@ class Panel(Actions):
                     self.callback_badge.configure(text='Runtime stopped - see Recovery log',text_color=color('status.warning'))
                 else:
                     self.callback_badge.configure(text=data['graphics'],text_color=color('text.muted'))
-                if not running:self.runtime_warned=False
+                if not running:self.runtime_warned=self.mismatch_warned=False
                 self.runtime_output.configure(state='normal');self.runtime_output.delete('1.0','end');self.runtime_output.insert('1.0','\n'.join(data['lines']));self.runtime_output.configure(state='disabled');self.runtime_output.see('end')
         except queue.Empty:pass
         self.update_nr_availability()

@@ -35,6 +35,7 @@ Do not combine renodx-dlss5.addon64 with renodx-dlss.addon64. Do not reinstall t
 
 ## If ReShade or DLSS 5 does not load
 
+- Confirm the folder at the top of the app is the Endfield you actually launch. A PC can hold two installations, one from Epic and one from the official Gryphline launcher. ReShade is registered per executable, so a setup applied to the copy you do not start never loads. Fate Engine preselects the install the game last ran from and warns when they differ.
 - Choose **Check setup** on the DLSS 5 page. It lists why ReShade's Vulkan layer is not registered for this game (wrong application path, missing files, or a declined administrator prompt), names the renderer of the last Endfield launch, and reports whether ReShade initialized and which add-ons it loaded.
 - The tested setup needs Endfield to run on **Vulkan**. If the last launch used Direct3D, the ReShade Vulkan layer and the DLSS 5 bridge cannot load, and Fate Engine refuses to install the components.
 - The ReShade wizard must be allowed to elevate. Without its administrator step the Vulkan layer is never registered, and Home does nothing in game.
