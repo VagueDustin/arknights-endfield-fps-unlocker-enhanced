@@ -20,7 +20,7 @@ Fate Engine manages the FPS unlocker and the tested neural components. ReShade p
 
 - **Home:** open ReShade. Finish or skip its first-run tutorial, then find the RenoDX DLSS 5 controls for styles, presets, and strength. Press Home again to close it.
 - **Insert:** toggle neural rendering. Fresh setups start with NR off. Existing settings are preserved.
-- Compare the same scene with NR on and off. The user's earlier test measured approximately 110 FPS off and 50 FPS on; this is an example, not a performance guarantee. The open overlay can also reduce FPS.
+- Compare the same scene with NR on and off. An earlier test measured about 110 FPS off and 50 FPS on; this is an example, not a performance guarantee. The open overlay can also reduce FPS.
 
 The app checks installed files and saved settings. It does not claim to measure active NR rendering. Styles and presets are adjusted in ReShade, not in Fate Engine.
 
@@ -51,4 +51,4 @@ Close Endfield. In Fate Engine, expand **repair and removal** and select **Remov
 
 The bundled 0.4.4 release includes the tested components with their original attribution. The project maintainer confirmed permission to distribute the full bundle. Third-party components retain their owners' licenses and rights; Fate Engine's MIT license does not relicense them. This is an experimental community tool, not an official NVIDIA, ReShade, or game-publisher product.
 
-Source/CI builds without the bundled components open the official ReShade download page and prompt for the user's component folder.
+Source/CI builds without the bundled components open the official ReShade download page and prompt for your component folder.

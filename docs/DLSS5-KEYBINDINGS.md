@@ -1,6 +1,6 @@
 # DLSS 5 keybindings
 
-The Fate Engine default for the tested RenoDX DLSS5 setup is **Insert**, confirmed working in Endfield by the user. F6 conflicts with an in-game menu.
+The Fate Engine default for the tested RenoDX DLSS5 setup is **Insert**, confirmed working in Endfield testing. F6 conflicts with an in-game menu.
 
 The addon setting in the game's `ReShade.ini` is:
 
