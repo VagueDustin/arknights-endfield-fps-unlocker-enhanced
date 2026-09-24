@@ -3,7 +3,7 @@
 Current milestone: compiled experimental FPS runtime and standalone desktop/CLI
 manager. The Windows CI build and native integration test passed at revision
 `b857401`. A local install completed with matching hashes and an intact compiler
-backup. On September 11, 2026, the user reported that the installed build
+backup. On September 11, 2026, the maintainer reported that the installed build
 "appears to be working perfectly." Runtime logs show repeated 30-to-144 FPS
 target transitions as focus changes. This is a successful initial gameplay test;
 extended stability, quantitative frame pacing, and other renderers remain unverified.
@@ -33,7 +33,7 @@ files were present. The runtime SHA-256 was
    two-minute bounded initialization, per-process logs, attached IL2CPP worker.
 2. Implemented: explicit directory selection, export/ordinal validation, checksums,
    backups, transaction journal, rollback, restore with conflict refusal.
-3. Initial launch/gameplay confirmed by the user; foreground/background changes
+3. Initial launch/gameplay confirmed by the maintainer; foreground/background changes
    confirmed in runtime logs. Pending: measured frame pacing, zone transitions,
    extended gameplay, other renderers, and real-game restore.
 4. Implemented: desktop/CLI managers, presets, live configuration, VSync control,

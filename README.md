@@ -1,31 +1,31 @@
-# Fate Engine - Arknights Endfield FPS Unlocker
+# Fate Engine: Arknights Endfield FPS Unlocker
 
-[Download Fate Engine 0.4.5 for Windows](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases/tag/v0.4.5) - latest release, with visible setup results, a GPU check for DLSS 5, and a diagnostics export. Includes the tested ReShade setup and DLSS 5 components. [Installation and in-game controls](docs/DLSS-RESHade-SETUP.md).
+[Download Fate Engine 0.4.5 for Windows](https://github.com/VagueDustin/arknights-endfield-fps-unlocker-enhanced/releases/tag/v0.4.5). The latest release shows setup results on screen, checks your GPU before setting up DLSS 5, and can export diagnostics. It includes the tested ReShade setup and DLSS 5 components. See [installation and in-game controls](docs/DLSS-RESHade-SETUP.md).
 
 ### [View interactive DLSS 5 comparisons](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
 
 Drag the comparison slider or switch between Off / On, presets, and styles. No download required.
 
-A standalone Windows desktop application by **VagueDustin Enterprises** for live FPS control and experimental graphics tuning in Arknights: Endfield. Community pull requests are welcome; VagueDustin maintains the project and controls releases.
-The native implementation lives in `src/modern`. See [third-party notices](THIRD_PARTY_NOTICES.md) for project origins and dependency attribution.
-An initial gameplay test on September 11, 2026 was reported working by the user;
-runtime logs also confirm foreground/background target changes. Extended stability
-and other rendering modes remain unverified. Graphics tuning remains experimental.
+Fate Engine is a standalone Windows desktop app from **VagueDustin Enterprises** for live FPS control and experimental graphics tuning in Arknights: Endfield. Community pull requests are welcome; VagueDustin maintains the project and controls releases. The native code lives in `src/modern`, and the [third-party notices](THIRD_PARTY_NOTICES.md) cover project origins and dependency attribution.
+
+An initial gameplay test on September 11, 2026 worked, and the runtime logs confirm
+the FPS target switches between foreground and background. Extended stability and
+other rendering modes are not verified yet, and graphics tuning is still experimental.
 
 ![Fate Engine desktop app](docs/desktop.png)
 
 ## DLSS 5 screenshot comparisons
 
-Neural rendering is working in the local experimental setup. **Requires a GeForce RTX 50-series GPU**: the tested NVIDIA neural runtime does not run on RTX 40 or older cards, and Fate Engine refuses the DLSS 5 setup when the game's Player.log shows another GPU. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). The 0.4.4 bundled installer includes the tested components. Choose the DLSS 5 page for its three-step ReShade setup. Presets are controlled in the ReShade overlay with Home.
+Neural rendering works in our experimental test setup. **Requires a GeForce RTX 50-series GPU**: the tested NVIDIA neural runtime does not run on RTX 40 or older cards, and Fate Engine refuses the DLSS 5 setup when the game's Player.log shows another GPU. **Insert** toggles it on and off; this is our default binding for Endfield. See [keybindings](docs/DLSS5-KEYBINDINGS.md) and [tested components and limitations](docs/DLSS5-FEASIBILITY.md). The bundled installer has included the tested components since 0.4.4. Open the DLSS 5 page for the three-step ReShade setup, then press Home in game to open the ReShade overlay, where the presets live.
 
 **Off on the left, on on the right:**
 
-[![Outdoor scene with neural rendering off and on - open interactive gallery](docs/comparisons/cover-preview.jpg)](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
+[![Outdoor scene with neural rendering off and on; opens the interactive gallery](docs/comparisons/cover-preview.jpg)](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)
 
-**[Open the interactive gallery](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)** for a draggable divider and instant **Off / Compare / On** buttons. It includes all five scenes, three numbered presets, and the Natural and Cinematic styles. You can also download or clone the repository and open `docs/comparisons/index.html` locally. GitHub Pages hosts the interactive view; the README below provides expandable static comparisons.
+**[Open the interactive gallery](https://vaguedustin.github.io/arknights-endfield-fps-unlocker-enhanced/)** for a draggable divider and instant **Off / Compare / On** buttons. It includes all five scenes, three numbered presets, and the Natural and Cinematic styles. You can also download or clone the repository and open `docs/comparisons/index.html` locally. The interactive view runs on GitHub Pages; the static comparisons below expand in place.
 
 <details>
-<summary>Interior - Default neural rendering</summary>
+<summary>Interior: default neural rendering</summary>
 
 ![Interior off and default NR on](docs/comparisons/interior-preview.jpg)
 
@@ -34,7 +34,7 @@ Neural rendering is working in the local experimental setup. **Requires a GeForc
 </details>
 
 <details>
-<summary>Team 1 - off / on</summary>
+<summary>Team 1: off / on</summary>
 
 ![Team 1 off and on](docs/comparisons/t1-preview.jpg)
 
@@ -43,7 +43,7 @@ Neural rendering is working in the local experimental setup. **Requires a GeForc
 </details>
 
 <details>
-<summary>Team 2 - off / on</summary>
+<summary>Team 2: off / on</summary>
 
 ![Team 2 off and on](docs/comparisons/t2-preview.jpg)
 
@@ -52,7 +52,7 @@ Neural rendering is working in the local experimental setup. **Requires a GeForc
 </details>
 
 <details>
-<summary>Team 3 - off / on</summary>
+<summary>Team 3: off / on</summary>
 
 ![Team 3 off and on](docs/comparisons/t3-preview.jpg)
 
@@ -73,7 +73,7 @@ Neural rendering is working in the local experimental setup. **Requires a GeForc
 
 </details>
 
-These are separate user-supplied captures, not synchronized frames or a controlled benchmark. Poses, camera, UI, and lighting can differ, especially between interior styles and presets. Full-size images preserve the original pixels as lossless WebP; side-by-side README previews are resized. The observed 110 FPS off / 50 FPS on result was from one earlier scene and should not be read as a benchmark for every screenshot.
+These are separate user-supplied captures, not synchronized frames or a controlled benchmark. Poses, camera, UI, and lighting can differ, especially between interior styles and presets. Full-size images preserve the original pixels as lossless WebP; side-by-side README previews are resized. The 110 FPS off / 50 FPS on figure came from one earlier scene; don't read it as a benchmark for every screenshot.
 
 ## Features
 
@@ -88,8 +88,8 @@ These are separate user-supplied captures, not synchronized frames or a controll
 - Upgrade with preservation of the previous build and its configuration.
 
 The desktop app provides a navy-and-gold live control panel, an install wizard, and experimental graphics controls. Graphics controls default to **Game** and
-are gated to the inspected runtime SHA-256. Unknown builds retain FPS support
-while graphics are disabled. The old graphics code is excluded from the build.
+are gated to the inspected runtime SHA-256. Unknown game builds keep FPS support,
+with graphics controls disabled. The old graphics code is excluded from the build.
 
 | Control | Values | Behavior |
 | --- | --- | --- |
@@ -126,7 +126,7 @@ it, and install with the game closed. The desktop defaults to 144 FPS, VSync off
 existing settings are loaded when available. CLI defaults are 120 FPS and no background cap. If Windows denies write access, run the manager as administrator.
 
 Launch through the normal game launcher. **Apply live settings** updates the runtime
-within approximately one second. VSync can override the FPS target. Unlimited
+within about a second. VSync can override the FPS target. Unlimited
 uses Unity's desktop value -1 with VSync off; see
 [Unity's FPS documentation](https://docs.unity3d.com/ScriptReference/Application-targetFrameRate.html).
 
