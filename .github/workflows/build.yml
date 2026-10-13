@@ -59,13 +59,13 @@ jobs:
           $remove = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw 'Uninstall failed' }
           if (Test-Path (Join-Path $target 'FateEngine.exe')) { throw 'App remains after uninstall' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: EndfieldEnhancer-windows-x64-experimental
           # main builds are release candidates (docs/RELEASE.md takes the runtime from them).
           retention-days: ${{ github.ref == 'refs/heads/main' && 30 || 7 }}
           path: build/package/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: EndfieldEnhancer-setup
           retention-days: ${{ github.ref == 'refs/heads/main' && 30 || 7 }}
