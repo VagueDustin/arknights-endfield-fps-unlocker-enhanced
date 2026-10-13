@@ -1,0 +1,17 @@
+# Python packages are pinned inline in the workflows and MinHook by commit in CMakeLists.txt, so
+# only the workflow actions have a manifest Dependabot can watch.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
