@@ -5,6 +5,10 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    # Inactive project: routine updates stay on minor/patch. Security alerts still report.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
